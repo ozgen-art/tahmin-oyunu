@@ -36,9 +36,6 @@ yarn-error.log*
 # vercel
 .vercel
 
-# yerel JSON veri deposu (maçlar, tahminler, liderlik tablosu)
-/data/
-
 # typescript
 *.tsbuildinfo
 next-env.d.ts
