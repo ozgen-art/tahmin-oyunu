@@ -505,6 +505,7 @@ export async function submitPrediction(input: {
 export interface LeaderboardRow {
   participantId: string;
   displayName: string;
+  createdAt: string;
   totalPoints: number;
   matchesPredicted: number;
   matchesFinished: number;
@@ -513,7 +514,7 @@ export interface LeaderboardRow {
 export async function getLeaderboard(): Promise<LeaderboardRow[]> {
   const db = getSupabaseAdmin();
   const [participantsRes, predictionsRes, matchesRes] = await Promise.all([
-    db.from("participants").select("id, display_name"),
+    db.from("participants").select("id, display_name, created_at"),
     db.from("predictions").select("*"),
     db.from("matches").select("id, status"),
   ]);
@@ -526,10 +527,11 @@ export async function getLeaderboard(): Promise<LeaderboardRow[]> {
   );
 
   const rows = new Map<string, LeaderboardRow>();
-  for (const p of participantsRes.data as Array<{ id: string; display_name: string }>) {
+  for (const p of participantsRes.data as Array<{ id: string; display_name: string; created_at: string }>) {
     rows.set(p.id, {
       participantId: p.id,
       displayName: p.display_name,
+      createdAt: p.created_at,
       totalPoints: 0,
       matchesPredicted: 0,
       matchesFinished: 0,

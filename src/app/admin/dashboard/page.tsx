@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { assertAdmin } from "@/lib/require-admin";
-import { listMatches } from "@/lib/db";
+import { getLeaderboard, listMatches } from "@/lib/db";
 import { adminLogoutAction } from "@/app/actions/admin";
 import NewMatchForm from "./NewMatchForm";
 
@@ -11,7 +11,10 @@ const COMPETITION_LABEL: Record<string, string> = {
 
 export default async function AdminDashboardPage() {
   await assertAdmin();
-  const matches = await listMatches();
+  const [matches, leaderboard] = await Promise.all([listMatches(), getLeaderboard()]);
+  const participants = [...leaderboard].sort(
+    (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+  );
 
   return (
     <div className="flex flex-col gap-8">
@@ -27,6 +30,41 @@ export default async function AdminDashboardPage() {
       <section className="flex flex-col gap-3">
         <h2 className="font-semibold">Yeni Maç Ekle</h2>
         <NewMatchForm />
+      </section>
+
+      <section className="flex flex-col gap-3">
+        <h2 className="font-semibold">Katılımcılar ({participants.length})</h2>
+        {participants.length === 0 ? (
+          <p className="text-sm text-black/50 dark:text-white/50">Henüz kimse kayıt olmadı.</p>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full min-w-[420px] border-collapse overflow-hidden rounded-lg border border-black/10 text-sm dark:border-white/15">
+              <thead>
+                <tr className="bg-black/5 dark:bg-white/5">
+                  <th className="px-3 py-2 text-left">İsim</th>
+                  <th className="px-3 py-2 text-left">Kayıt Tarihi</th>
+                  <th className="px-3 py-2 text-right">Tahmin</th>
+                  <th className="px-3 py-2 text-right">Puan</th>
+                </tr>
+              </thead>
+              <tbody>
+                {participants.map((p) => (
+                  <tr key={p.participantId} className="border-t border-black/10 dark:border-white/10">
+                    <td className="px-3 py-2 font-medium">{p.displayName}</td>
+                    <td className="px-3 py-2 text-black/60 dark:text-white/60">
+                      {new Date(p.createdAt).toLocaleString("tr-TR", {
+                        dateStyle: "medium",
+                        timeStyle: "short",
+                      })}
+                    </td>
+                    <td className="px-3 py-2 text-right">{p.matchesPredicted}</td>
+                    <td className="px-3 py-2 text-right font-semibold">{p.totalPoints}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
       </section>
 
       <section className="flex flex-col gap-3">
