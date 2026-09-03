@@ -47,9 +47,12 @@ npm run migrate               # supabase/migrations/*.sql dosyalarını sırayla
 ```
 
 `supabase/migrations/0001_init.sql` şemayı kurar (RLS her tabloda açık, hiç policy yok — sadece
-service-role anahtarı, yani sunucu tarafı erişebilir). `0002_seed_matches.sql`, tablo boşsa birkaç
-örnek UCL/UEL maçı ekler (gerçek takım isimleriyle ama uydurma oranlarla) — admin panelinden
-silinip gerçek maçlarla değiştirilebilir.
+service-role anahtarı, yani sunucu tarafı erişebilir). `0002_seed_matches.sql` artık no-op —
+başlangıçta arayüzü göstermek için örnek/mock maç ekliyordu, ama site canlıya alınıp gerçek
+kullanıcılar kayıt olduktan sonra bu sahte maçlar kaldırıldı (asla sonuçlanmayacaklardı). Yeni
+maçlar admin panelinden ekleniyor — bkz. aşağıdaki "Canlı oran/sonuç API'si" bölümü.
+`0003_add_external_ref.sql`, API'den içe aktarılan maçları tekrar eklememek için bir dedupe
+sütunu ekler.
 
 ### 3. Çalıştır
 
@@ -76,6 +79,7 @@ npm run dev
    - `ADMIN_PASSWORD`
    - `NEXT_PUBLIC_SUPABASE_URL`
    - `SUPABASE_SERVICE_ROLE_KEY`
+   - `API_FOOTBALL_KEY` (admin panelindeki "API'den Maç İçe Aktar" butonu için)
    - `DATABASE_URL` gerekmiyor (sadece `npm run migrate` yerelde/CI'da çalıştırılır, Vercel'de
      runtime'da kullanılmaz)
 4. Deploy. Migration'ları Vercel değil, siz (yerelden `npm run migrate` ile) veya bir CI adımı
@@ -85,12 +89,21 @@ Sonraki her `git push` otomatik yeni bir deploy tetikler. Yeni bir migration ekl
 (`supabase/migrations/000X_....sql`), deploy'dan önce/sonra yerelden `npm run migrate` ile
 uygulamanız gerekir (Vercel build adımı migration çalıştırmaz).
 
-### Canlı oran/sonuç API'si bağlamak için
+### Canlı oran/sonuç API'si: API-Football
 
-`src/lib/odds-source.ts` dosyası, ileride gerçek bir maç/oran API'sine (API-Football, Odds API
-vb.) bağlanmak için hazırlanmış bir arayüz (`ExternalMatch` tipi ve
-`fetchUpcomingMatchesFromLiveApi()` stub'ı) içeriyor. Sadece Şampiyonlar Ligi ve Avrupa Ligi
-maçlarının alındığından emin olun (competition/league id filtresi).
+`src/lib/odds-source.ts`, [api-football.com](https://www.api-football.com) (api-sports.io) ile
+entegre — admin panelindeki **"Bugün/Yarının UCL-UEL Maçlarını API'den Çek"** butonu bu dosyadaki
+`fetchUpcomingMatchesFromLiveApi()`'yi çağırır: league id `2` (UCL) ve `3` (UEL) için maç sonucu,
+kesin skor ve ilk gol atan oranlarını çeker, yeni maçları oluşturur / henüz kilitlenmemiş
+maçların oranlarını günceller (`external_ref` ile dedupe edilir).
+
+**Önemli kısıt:** ücretsiz API-Football planı hem `/fixtures` hem `/odds` uç noktalarında sadece
+**dün/bugün/yarın** penceresine izin veriyor (her gün kayar) — daha ileri bir tarih istenirse API
+hata döner. Bu yüzden bir maçı yakalamak için butona **her gün** basmak gerekiyor; ileri tarihli
+bir maç takvimi/fikstür listesi gösteremiyoruz. Üst plana (Pro/Ultra/Mega, $19/ay+) geçilirse bu
+kısıt kalkar ve daha geniş bir tarih aralığı sorgulanabilir — `odds-source.ts`'te değişiklik
+gerekmez. Ayrıca "İlk Golü Atan" piyasası sadece bazı bookmaker'larda/büyük maçlarda mevcut; boş
+gelirse admin panelinden elle tamamlanmalı.
 
 ## Puanlama mantığı özeti
 

@@ -70,9 +70,16 @@ create table if not exists scorer_options (
   unique (match_id, player_name)
 );
 
-alter table matches
-  add constraint matches_final_scorer_option_id_fkey
-  foreign key (final_scorer_option_id) references scorer_options(id) on delete set null;
+do $$
+begin
+  if not exists (
+    select 1 from pg_constraint where conname = 'matches_final_scorer_option_id_fkey'
+  ) then
+    alter table matches
+      add constraint matches_final_scorer_option_id_fkey
+      foreign key (final_scorer_option_id) references scorer_options(id) on delete set null;
+  end if;
+end $$;
 
 -- ---------------------------------------------------------------------------
 -- Katılımcılar (isim + PIN ile basit oturum, hesap/e-posta gerekmez)

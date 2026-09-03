@@ -3,6 +3,7 @@ import { assertAdmin } from "@/lib/require-admin";
 import { getLeaderboard, listMatches } from "@/lib/db";
 import { adminLogoutAction } from "@/app/actions/admin";
 import NewMatchForm from "./NewMatchForm";
+import ImportMatchesButton from "./ImportMatchesButton";
 
 const COMPETITION_LABEL: Record<string, string> = {
   UCL: "Şampiyonlar Ligi",
@@ -28,7 +29,16 @@ export default async function AdminDashboardPage() {
       </div>
 
       <section className="flex flex-col gap-3">
-        <h2 className="font-semibold">Yeni Maç Ekle</h2>
+        <h2 className="font-semibold">API&apos;den Maç İçe Aktar</h2>
+        <p className="text-sm text-black/60 dark:text-white/60">
+          API-Football&apos;un ücretsiz planı sadece bugün/yarın için veri verdiğinden, yeni bir
+          UCL/UEL maçını yakalamak için bu butona her gün basmanız gerekir.
+        </p>
+        <ImportMatchesButton />
+      </section>
+
+      <section className="flex flex-col gap-3">
+        <h2 className="font-semibold">Yeni Maç Ekle (Manuel)</h2>
         <NewMatchForm />
       </section>
 

@@ -17,6 +17,7 @@ export interface Match {
   finalAwayScore?: number;
   finalWinner?: Outcome;
   finalScorerOptionId?: string;
+  externalRef?: string;
   createdAt: string;
 }
 

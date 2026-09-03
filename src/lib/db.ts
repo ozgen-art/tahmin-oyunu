@@ -30,6 +30,7 @@ interface MatchRow {
   final_away_score: number | null;
   final_winner: Outcome | null;
   final_scorer_option_id: string | null;
+  external_ref: string | null;
   created_at: string;
 }
 
@@ -45,6 +46,7 @@ function mapMatch(row: MatchRow): Match {
     finalAwayScore: row.final_away_score ?? undefined,
     finalWinner: row.final_winner ?? undefined,
     finalScorerOptionId: row.final_scorer_option_id ?? undefined,
+    externalRef: row.external_ref ?? undefined,
     createdAt: row.created_at,
   };
 }
@@ -188,6 +190,7 @@ export async function createMatch(input: {
   homeTeam: string;
   awayTeam: string;
   kickoffAt: string;
+  externalRef?: string;
 }): Promise<Match> {
   const db = getSupabaseAdmin();
   const { data, error } = await db
@@ -197,11 +200,23 @@ export async function createMatch(input: {
       home_team: input.homeTeam.trim(),
       away_team: input.awayTeam.trim(),
       kickoff_at: new Date(input.kickoffAt).toISOString(),
+      external_ref: input.externalRef ?? null,
     })
     .select("*")
     .single();
   if (error) throw new Error(error.message);
   return mapMatch(data as MatchRow);
+}
+
+export async function findMatchByExternalRef(externalRef: string): Promise<Match | null> {
+  const db = getSupabaseAdmin();
+  const { data, error } = await db
+    .from("matches")
+    .select("*")
+    .eq("external_ref", externalRef)
+    .maybeSingle();
+  if (error) throw new Error(error.message);
+  return data ? mapMatch(data as MatchRow) : null;
 }
 
 export async function updateMatchInfo(

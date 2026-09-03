@@ -11,16 +11,20 @@ import {
   createMatch,
   deleteMatch as deleteMatchDb,
   finalizeMatch as finalizeMatchDb,
+  findMatchByExternalRef,
+  getMatchPhaseSync,
   reopenMatch as reopenMatchDb,
   setResultOptions,
   setScoreOptions,
   setScorerOptions,
   updateMatchInfo,
 } from "@/lib/db";
+import { fetchUpcomingMatchesFromLiveApi } from "@/lib/odds-source";
 
 export interface AdminActionState {
   error?: string;
   success?: boolean;
+  message?: string;
 }
 
 export async function adminLoginAction(
@@ -207,4 +211,76 @@ export async function reopenMatchAction(formData: FormData): Promise<void> {
   revalidatePath("/admin/dashboard");
   revalidatePath("/maclar");
   revalidatePath("/liderlik-tablosu");
+}
+
+/**
+ * API-Football'dan bugün + yarın için UCL/UEL maçlarını çeker. Yeni bir maç
+ * bulunursa oluşturur; daha önce içe aktarılmış ama henüz kilitlenmemiş
+ * (başlama saati gelmemiş) bir maç varsa oranlarını günceller. Kilitlenmiş
+ * veya sonuçlanmış maçlara dokunmaz.
+ */
+export async function importMatchesFromApiAction(
+  _prevState: AdminActionState,
+  _formData: FormData
+): Promise<AdminActionState> {
+  await assertAdmin();
+
+  let externalMatches;
+  try {
+    externalMatches = await fetchUpcomingMatchesFromLiveApi();
+  } catch (err) {
+    return { error: err instanceof Error ? err.message : "API-Football isteği başarısız." };
+  }
+
+  if (externalMatches.length === 0) {
+    return { success: true, message: "Bugün/yarın için UCL veya UEL maçı bulunamadı." };
+  }
+
+  let created = 0;
+  let updated = 0;
+  let skipped = 0;
+
+  for (const em of externalMatches) {
+    const existing = await findMatchByExternalRef(em.externalId);
+    let matchId: string;
+
+    if (existing) {
+      if (getMatchPhaseSync(existing) !== "open") {
+        skipped += 1;
+        continue;
+      }
+      matchId = existing.id;
+      updated += 1;
+    } else {
+      const match = await createMatch({
+        competition: em.competition,
+        homeTeam: em.homeTeam,
+        awayTeam: em.awayTeam,
+        kickoffAt: em.kickoffAt,
+        externalRef: em.externalId,
+      });
+      matchId = match.id;
+      created += 1;
+    }
+
+    if (em.result1x2Odds) {
+      await setResultOptions(matchId, em.result1x2Odds);
+    }
+    if (em.correctScoreOdds.length > 0) {
+      await setScoreOptions(matchId, em.correctScoreOdds);
+    }
+    if (em.firstScorerOdds.length > 0) {
+      await setScorerOptions(matchId, em.firstScorerOdds);
+    }
+  }
+
+  revalidatePath("/admin/dashboard");
+  revalidatePath("/maclar");
+
+  const parts = [];
+  if (created > 0) parts.push(`${created} yeni maç eklendi`);
+  if (updated > 0) parts.push(`${updated} maçın oranı güncellendi`);
+  if (skipped > 0) parts.push(`${skipped} maç zaten kilitli olduğu için atlandı`);
+
+  return { success: true, message: parts.join(", ") || "İşlem tamamlandı." };
 }
