@@ -13,13 +13,19 @@ import {
   finalizeMatch as finalizeMatchDb,
   findMatchByExternalRef,
   getMatchPhaseSync,
+  getMatchWithOptions,
+  listMatches,
   reopenMatch as reopenMatchDb,
   setResultOptions,
   setScoreOptions,
   setScorerOptions,
   updateMatchInfo,
 } from "@/lib/db";
-import { fetchUpcomingMatchesFromLiveApi } from "@/lib/odds-source";
+import {
+  fetchFinishedResultFromLiveApi,
+  fetchUpcomingMatchesFromLiveApi,
+  matchScorerName,
+} from "@/lib/odds-source";
 
 export interface AdminActionState {
   error?: string;
@@ -281,6 +287,74 @@ export async function importMatchesFromApiAction(
   if (created > 0) parts.push(`${created} yeni maç eklendi`);
   if (updated > 0) parts.push(`${updated} maçın oranı güncellendi`);
   if (skipped > 0) parts.push(`${skipped} maç zaten kilitli olduğu için atlandı`);
+
+  return { success: true, message: parts.join(", ") || "İşlem tamamlandı." };
+}
+
+/**
+ * API'den içe aktarılmış (external_ref dolu), başlama saati geçmiş ama henüz
+ * sonuçlanmamış maçları API-Football'dan kontrol eder: maç bitmişse (FT)
+ * final skoru + ilk golü atan oyuncuyu çeker, oyuncuyu maçın kayıtlı
+ * scorer_options listesiyle eşleştirip maçı otomatik sonuçlandırır (puanlar
+ * hesaplanır). API'de henüz bitmemiş görünen maçlara dokunmaz.
+ */
+export async function syncResultsFromApiAction(
+  _prevState: AdminActionState,
+  _formData: FormData
+): Promise<AdminActionState> {
+  await assertAdmin();
+
+  const allMatches = await listMatches();
+  const candidates = allMatches.filter(
+    (m) => m.externalRef && getMatchPhaseSync(m) === "locked"
+  );
+
+  if (candidates.length === 0) {
+    return { success: true, message: "Sonuçlanmayı bekleyen API kaynaklı maç yok." };
+  }
+
+  let finalized = 0;
+  let notYetFinished = 0;
+  let scorerUnmatched = 0;
+  let failed = 0;
+
+  for (const match of candidates) {
+    try {
+      const result = await fetchFinishedResultFromLiveApi(match.externalRef!);
+      if (!result) {
+        notYetFinished += 1;
+        continue;
+      }
+
+      const full = await getMatchWithOptions(match.id);
+      const finalScorerOptionId = full
+        ? matchScorerName(result.firstScorerName, full.scorerOptions)
+        : null;
+      if (result.firstScorerName !== null && !finalScorerOptionId) scorerUnmatched += 1;
+
+      await finalizeMatchDb(match.id, {
+        finalHomeScore: result.finalHomeScore,
+        finalAwayScore: result.finalAwayScore,
+        finalScorerOptionId,
+      });
+      finalized += 1;
+    } catch {
+      failed += 1;
+    }
+  }
+
+  revalidatePath("/admin/dashboard");
+  revalidatePath("/maclar");
+  revalidatePath("/tahminlerim");
+  revalidatePath("/liderlik-tablosu");
+
+  const parts: string[] = [];
+  if (finalized > 0) parts.push(`${finalized} maç sonuçlandırıldı ve puanlar hesaplandı`);
+  if (scorerUnmatched > 0) {
+    parts.push(`${scorerUnmatched} maçta ilk golü atan oyuncu eşleştirilemedi (elle seçin)`);
+  }
+  if (notYetFinished > 0) parts.push(`${notYetFinished} maç API'de henüz bitmemiş görünüyor`);
+  if (failed > 0) parts.push(`${failed} maçta hata oluştu`);
 
   return { success: true, message: parts.join(", ") || "İşlem tamamlandı." };
 }

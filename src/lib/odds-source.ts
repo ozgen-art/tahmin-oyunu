@@ -160,6 +160,96 @@ async function fetchOddsForFixture(fixtureId: number): Promise<{
   return { result1x2Odds, correctScoreOdds, firstScorerOdds };
 }
 
+export interface ExternalResult {
+  finalHomeScore: number;
+  finalAwayScore: number;
+  /** API'nin döndürdüğü ilk golü atan oyuncunun adı; 0-0 ise null. */
+  firstScorerName: string | null;
+}
+
+interface FixtureEvent {
+  time: { elapsed: number };
+  type: string;
+  detail: string;
+  player: { name: string };
+}
+
+function normalizePlayerName(name: string): string {
+  return name
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "") // aksan işaretlerini kaldır (é -> e, ı -> i vb.)
+    .toLowerCase()
+    .trim();
+}
+
+async function fetchFixtureById(fixtureId: number): Promise<{
+  status: string;
+  homeGoals: number | null;
+  awayGoals: number | null;
+} | null> {
+  const json = await apiFootballGet("/fixtures", { id: String(fixtureId) });
+  const f = json.response?.[0];
+  if (!f) return null;
+  return {
+    status: f.fixture.status.short,
+    homeGoals: f.goals.home,
+    awayGoals: f.goals.away,
+  };
+}
+
+async function fetchFirstGoalScorerName(fixtureId: number): Promise<string | null> {
+  const json = await apiFootballGet("/fixtures/events", { fixture: String(fixtureId) });
+  const events = (json.response ?? []) as FixtureEvent[];
+  const goals = events
+    .filter((e) => e.type === "Goal" && e.detail !== "Missed Penalty")
+    .sort((a, b) => a.time.elapsed - b.time.elapsed);
+  return goals[0]?.player.name ?? null;
+}
+
+/**
+ * Daha önce API'den içe aktarılmış (externalId `api-football:<fixtureId>`
+ * biçiminde) bir maçın sonucunu döner. Maç API'de henüz bitmemişse
+ * (status "FT" değilse) `null` döner — admin panelinden tekrar denenebilir.
+ */
+export async function fetchFinishedResultFromLiveApi(
+  externalId: string
+): Promise<ExternalResult | null> {
+  const fixtureId = Number(externalId.replace("api-football:", ""));
+  if (!Number.isFinite(fixtureId)) return null;
+
+  const fixture = await fetchFixtureById(fixtureId);
+  if (!fixture || fixture.status !== "FT") return null;
+  if (fixture.homeGoals === null || fixture.awayGoals === null) return null;
+
+  const firstScorerName =
+    fixture.homeGoals + fixture.awayGoals > 0 ? await fetchFirstGoalScorerName(fixtureId) : null;
+
+  return {
+    finalHomeScore: fixture.homeGoals,
+    finalAwayScore: fixture.awayGoals,
+    firstScorerName,
+  };
+}
+
+/** `firstScorerName`'i, bir maçın önceden kaydedilmiş scorer_options listesindeki
+ * (aksan/boşluk farklarına toleranslı) en yakın seçeneğin id'sine eşler. Gol
+ * atılmadıysa (0-0) "Gol olmaz" seçeneğini bulmaya çalışır. Eşleşme yoksa
+ * `null` döner — admin panelinden elle seçilebilir. */
+export function matchScorerName(
+  firstScorerName: string | null,
+  scorerOptions: Array<{ id: string; playerName: string }>
+): string | null {
+  if (firstScorerName === null) {
+    return (
+      scorerOptions.find((o) =>
+        normalizePlayerName(o.playerName).replace(/\s+/g, "").includes("gololmaz")
+      )?.id ?? null
+    );
+  }
+  const normalized = normalizePlayerName(firstScorerName);
+  return scorerOptions.find((o) => normalizePlayerName(o.playerName) === normalized)?.id ?? null;
+}
+
 /**
  * Bugün ve yarın için UCL/UEL maçlarını (henüz başlamamış olanları), varsa
  * oranlarıyla birlikte döner. Oran bulunamayan piyasalar boş dizi/`null`

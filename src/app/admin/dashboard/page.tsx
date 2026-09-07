@@ -4,6 +4,7 @@ import { getLeaderboard, listMatches } from "@/lib/db";
 import { adminLogoutAction } from "@/app/actions/admin";
 import NewMatchForm from "./NewMatchForm";
 import ImportMatchesButton from "./ImportMatchesButton";
+import SyncResultsButton from "./SyncResultsButton";
 
 const COMPETITION_LABEL: Record<string, string> = {
   UCL: "Şampiyonlar Ligi",
@@ -35,6 +36,16 @@ export default async function AdminDashboardPage() {
           UCL/UEL maçını yakalamak için bu butona her gün basmanız gerekir.
         </p>
         <ImportMatchesButton />
+      </section>
+
+      <section className="flex flex-col gap-3">
+        <h2 className="font-semibold">Biten Maçların Sonucunu İçe Aktar</h2>
+        <p className="text-sm text-black/60 dark:text-white/60">
+          Başlama saati geçmiş ama henüz sonuçlandırılmamış, API&apos;den eklenen maçları
+          kontrol eder; API&apos;de maç bitmiş görünüyorsa final skoru ve ilk golü atan
+          oyuncuyu çekip maçı otomatik sonuçlandırır (puanlar hesaplanır).
+        </p>
+        <SyncResultsButton />
       </section>
 
       <section className="flex flex-col gap-3">
