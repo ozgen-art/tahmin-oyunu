@@ -1,5 +1,6 @@
 import { notFound, redirect } from "next/navigation";
-import { getMatchPhaseSync, getMatchWithOptions, getPrediction } from "@/lib/db";
+import { getMatchPhaseSync, getMatchWithOptions, getPrediction, hasUsedJokerThisWeek } from "@/lib/db";
+import { getIsoWeekKey } from "@/lib/joker";
 import { getCurrentParticipant } from "@/lib/participant-session";
 import PredictionForm from "./PredictionForm";
 import PredictionSummary from "./PredictionSummary";
@@ -24,6 +25,16 @@ export default async function MatchPage({
   const existing = await getPrediction(participant.id, matchId);
   const phase = getMatchPhaseSync(match);
 
+  let jokerAvailableThisWeek = false;
+  if (match.isJokerEligible && phase === "open") {
+    const alreadyUsedElsewhere = await hasUsedJokerThisWeek(
+      participant.id,
+      getIsoWeekKey(match.kickoffAt),
+      matchId
+    );
+    jokerAvailableThisWeek = !alreadyUsedElsewhere;
+  }
+
   return (
     <div className="flex flex-col gap-6">
       <div>
@@ -46,7 +57,11 @@ export default async function MatchPage({
       </div>
 
       {phase === "open" ? (
-        <PredictionForm match={match} existing={existing} />
+        <PredictionForm
+          match={match}
+          existing={existing}
+          jokerAvailableThisWeek={jokerAvailableThisWeek}
+        />
       ) : (
         <PredictionSummary match={match} existing={existing} />
       )}

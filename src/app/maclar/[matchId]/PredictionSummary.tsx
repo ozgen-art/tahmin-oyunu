@@ -20,8 +20,9 @@ export default function PredictionSummary({
   }
 
   const resultOpt = match.resultOptions.find((o) => o.id === existing.resultOptionId);
-  const scoreOpt = match.scoreOptions.find((o) => o.id === existing.scoreOptionId);
   const scorerOpt = match.scorerOptions.find((o) => o.id === existing.scorerOptionId);
+  const hasScorePrediction =
+    existing.predictedHomeScore !== undefined && existing.predictedAwayScore !== undefined;
 
   const rows = [
     {
@@ -34,19 +35,18 @@ export default function PredictionSummary({
             : formatOutcome("draw")
         : "—",
       points: existing.resultPointsEarned,
-      possible: resultOpt?.points,
     },
     {
       label: "Kesin Skor",
-      value: scoreOpt ? `${scoreOpt.homeScore}-${scoreOpt.awayScore}` : "—",
+      value: hasScorePrediction
+        ? `${existing.predictedHomeScore}-${existing.predictedAwayScore}`
+        : "—",
       points: existing.scorePointsEarned,
-      possible: scoreOpt?.points,
     },
     {
       label: "İlk Golü Atan",
       value: scorerOpt?.playerName ?? "—",
       points: existing.scorerPointsEarned,
-      possible: scorerOpt?.points,
     },
   ];
 
@@ -57,6 +57,11 @@ export default function PredictionSummary({
 
   return (
     <div className="flex flex-col gap-3">
+      {existing.jokerUsed && (
+        <p className="w-fit rounded bg-amber-400/15 px-3 py-1 text-sm font-medium text-amber-700 dark:text-amber-400">
+          🃏 Bu maçta jokerini kullandın — puanların 3 katına çıktı.
+        </p>
+      )}
       {finished && (
         <p className="text-lg font-semibold">
           Bu maçtan kazandığın puan: <span className="text-indigo-600 dark:text-indigo-400">{total}</span>
@@ -83,7 +88,7 @@ export default function PredictionSummary({
                       : "text-black/40 dark:text-white/40"
                   }`}
                 >
-                  {row.value === "—" ? "—" : `${row.points ?? 0}${row.possible ? ` / ${row.possible}` : ""}`}
+                  {row.value === "—" ? "—" : (row.points ?? 0)}
                 </td>
               )}
             </tr>

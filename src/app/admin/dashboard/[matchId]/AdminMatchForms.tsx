@@ -188,6 +188,10 @@ export function FinalizeForm({
 }) {
   const [state, formAction, pending] = useActionState(finalizeMatchAction, emptyState);
   return (
+    <>
+    {/* Not: "Sonucu geri al" formu bilerek bunun DIŞINDA (aşağıda, kardeş
+        eleman olarak) render ediliyor — HTML'de <form> içine <form>
+        yerleştirilemez. */}
     <form action={formAction} className="grid gap-3 sm:grid-cols-3">
       <input type="hidden" name="matchId" value={matchId} />
       <div className="flex flex-col gap-1.5">
@@ -241,16 +245,17 @@ export function FinalizeForm({
         >
           {pending ? "Kaydediliyor…" : "Maçı Sonuçlandır ve Puanları Hesapla"}
         </button>
-        {match.status === "finished" && (
-          <form action={reopenMatchAction}>
-            <input type="hidden" name="matchId" value={matchId} />
-            <button type="submit" className="text-sm text-black/50 hover:underline dark:text-white/50">
-              Sonucu geri al
-            </button>
-          </form>
-        )}
       </div>
     </form>
+    {match.status === "finished" && (
+      <form action={reopenMatchAction} className="mt-3">
+        <input type="hidden" name="matchId" value={matchId} />
+        <button type="submit" className="text-sm text-black/50 hover:underline dark:text-white/50">
+          Sonucu geri al
+        </button>
+      </form>
+    )}
+  </>
   );
 }
 

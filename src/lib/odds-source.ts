@@ -88,12 +88,29 @@ interface OddBookmaker {
   bets: OddBet[];
 }
 
-function findBet(bookmakers: OddBookmaker[], betId: number): OddBet | null {
+/**
+ * Bir bet (market) tipi için TÜM bahisçilerin verdiği oranları, "değer"
+ * (ör. "Home", "2:1", oyuncu adı) bazında ortalayarak "optimum" — tek bir
+ * bahisçiye bağlı kalmayan, daha dengeli — bir oran haritası üretir.
+ * Kullanıcıya hiç gösterilmiyor, sadece dahili puan hesaplaması için.
+ */
+function averageBetValues(bookmakers: OddBookmaker[], betId: number): Map<string, number> {
+  const sums = new Map<string, { sum: number; count: number }>();
   for (const bm of bookmakers) {
     const bet = bm.bets.find((b) => b.id === betId);
-    if (bet && bet.values.length > 0) return bet;
+    if (!bet) continue;
+    for (const v of bet.values) {
+      const odd = Number(v.odd);
+      if (!Number.isFinite(odd) || odd <= 1) continue;
+      const entry = sums.get(v.value) ?? { sum: 0, count: 0 };
+      entry.sum += odd;
+      entry.count += 1;
+      sums.set(v.value, entry);
+    }
   }
-  return null;
+  const averaged = new Map<string, number>();
+  for (const [value, { sum, count }] of sums) averaged.set(value, sum / count);
+  return averaged;
 }
 
 async function fetchOddsForFixture(fixtureId: number): Promise<{
@@ -104,57 +121,45 @@ async function fetchOddsForFixture(fixtureId: number): Promise<{
   const json = await apiFootballGet("/odds", { fixture: String(fixtureId) });
   const bookmakers: OddBookmaker[] = json.response?.[0]?.bookmakers ?? [];
 
-  // Maç Sonucu (1 / Berabere / 2)
+  // Maç Sonucu (1 / Berabere / 2) — tüm bahisçilerin ortalaması
   let result1x2Odds: ExternalMatch["result1x2Odds"] = null;
-  const winnerBet = findBet(bookmakers, BET_MATCH_WINNER);
-  if (winnerBet) {
-    const home = winnerBet.values.find((v) => v.value === "Home");
-    const draw = winnerBet.values.find((v) => v.value === "Draw");
-    const away = winnerBet.values.find((v) => v.value === "Away");
-    if (home && draw && away) {
-      result1x2Odds = { home: Number(home.odd), draw: Number(draw.odd), away: Number(away.odd) };
-    }
+  const winnerOdds = averageBetValues(bookmakers, BET_MATCH_WINNER);
+  if (winnerOdds.has("Home") && winnerOdds.has("Draw") && winnerOdds.has("Away")) {
+    result1x2Odds = {
+      home: winnerOdds.get("Home")!,
+      draw: winnerOdds.get("Draw")!,
+      away: winnerOdds.get("Away")!,
+    };
   }
 
-  // Kesin Skor — en olası (en düşük oranlı) 8 skor
+  // Kesin Skor — en olası (en düşük ortalama oranlı) 8 skor
   const correctScoreOdds: ExternalMatch["correctScoreOdds"] = [];
-  const scoreBet = findBet(bookmakers, BET_EXACT_SCORE);
-  if (scoreBet) {
-    for (const v of scoreBet.values) {
-      const m = v.value.match(/^(\d+)\s*[:\-]\s*(\d+)$/);
-      if (!m) continue; // "Other"/"Any Unquoted" gibi seçenekleri atla
-      const odds = Number(v.odd);
-      if (!Number.isFinite(odds) || odds <= 1) continue;
-      correctScoreOdds.push({ homeScore: Number(m[1]), awayScore: Number(m[2]), odds });
-    }
-    correctScoreOdds.sort((a, b) => a.odds - b.odds);
-    correctScoreOdds.splice(8);
+  const scoreOdds = averageBetValues(bookmakers, BET_EXACT_SCORE);
+  for (const [value, odds] of scoreOdds) {
+    const m = value.match(/^(\d+)\s*[:\-]\s*(\d+)$/);
+    if (!m) continue; // "Other"/"Any Unquoted" gibi seçenekleri atla
+    correctScoreOdds.push({ homeScore: Number(m[1]), awayScore: Number(m[2]), odds });
   }
+  correctScoreOdds.sort((a, b) => a.odds - b.odds);
+  correctScoreOdds.splice(8);
 
   // İlk Golü Atan — en olası 6 oyuncu + "Gol olmaz" (API bu marketi sadece
   // büyük maçlarda/bazı bahisçilerde sunuyor; yoksa boş döner, admin elle
   // girer).
   const firstScorerOdds: ExternalMatch["firstScorerOdds"] = [];
-  const scorerBet = findBet(bookmakers, BET_FIRST_GOAL_SCORER);
-  if (scorerBet) {
-    for (const v of scorerBet.values) {
-      const odds = Number(v.odd);
-      if (!Number.isFinite(odds) || odds <= 1) continue;
-      // API oyuncunun takımını bu markette vermiyor; taraf bilgisi olmadan
-      // "none" (nötr) olarak işaretliyoruz — arayüzde sadece opsiyonel bir
-      // ipucu olarak kullanılıyor, işlevi etkilemiyor.
-      firstScorerOdds.push({ playerName: v.value, teamSide: "none", odds });
-    }
-    firstScorerOdds.sort((a, b) => a.odds - b.odds);
-    firstScorerOdds.splice(6);
-    if (firstScorerOdds.length > 0) {
-      const zeroZero = correctScoreOdds.find((s) => s.homeScore === 0 && s.awayScore === 0);
-      firstScorerOdds.push({
-        playerName: "Gol olmaz / Diğer",
-        teamSide: "none",
-        odds: zeroZero?.odds ?? 7,
-      });
-    }
+  const scorerOdds = averageBetValues(bookmakers, BET_FIRST_GOAL_SCORER);
+  for (const [playerName, odds] of scorerOdds) {
+    firstScorerOdds.push({ playerName, teamSide: "none", odds });
+  }
+  firstScorerOdds.sort((a, b) => a.odds - b.odds);
+  firstScorerOdds.splice(6);
+  if (firstScorerOdds.length > 0) {
+    const zeroZero = correctScoreOdds.find((s) => s.homeScore === 0 && s.awayScore === 0);
+    firstScorerOdds.push({
+      playerName: "Gol olmaz / Diğer",
+      teamSide: "none",
+      odds: zeroZero?.odds ?? 7,
+    });
   }
 
   return { result1x2Odds, correctScoreOdds, firstScorerOdds };

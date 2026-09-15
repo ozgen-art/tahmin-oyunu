@@ -3,11 +3,16 @@
 Sadece **UEFA Şampiyonlar Ligi** ve **UEFA Avrupa Ligi** maçları için çalışan bir web tahmin
 yarışması. Katılımcılar her maç için üç kategoride tahmin yapar:
 
-1. **Maç Sonucu** (1 / Berabere / 2)
-2. **Kesin Skor**
-3. **İlk Golü Atan Oyuncu**
+1. **Maç Sonucu** (1 / Berabere / 2) — listeden seçilir
+2. **Kesin Skor** — elle girilir (ör. "3-2"), listeden seçilmez
+3. **İlk Golü Atan Oyuncu** — listeden seçilir
 
-Her seçeneğin puanı, o seçeneğin bahis oranından türetilir:
+**Oranlar ve puanlar katılımcıya hiç gösterilmez.** Tahminler kör olarak girilir; puan
+hesaplaması tamamen arka planda yapılır (bkz. [Puanlama mantığı özeti](#puanlama-mantığı-özeti)).
+Admin panelinde ise oranlar görünür durumda kalır.
+
+Temel puan formülü, o seçeneğin (veya çekilen tüm bahisçilerin ortalamasının) oranından
+türetilir:
 
 ```
 puan = round(oran × 10)
@@ -108,11 +113,24 @@ gelirse admin panelinden elle tamamlanmalı.
 ## Puanlama mantığı özeti
 
 - Bir maça **başlama saatinden sonra** tahmin girilemez/değiştirilemez (kilitlenir).
-- Maç `finalize` edildiğinde (admin panelinden gerçek skor + ilk gol atan girilir):
-  - Maç sonucu skor'dan otomatik türetilir (DB'de generated column).
-  - Her katılımcının tahmini, üç kategoride ayrı ayrı doğru/yanlış değerlendirilir; doğru olan
-    her kategori, katılımcının **seçtiği seçeneğin puanını** kazanır.
-  - Liderlik tablosu, tüm sonuçlanmış maçlardaki kazanılan puanların toplamıdır.
+- **Oranlar/puanlar katılımcıya hiç gösterilmez** — tahminler kör girilir, puan sadece maç
+  bittikten sonra (`/tahminlerim`, maç sayfası, liderlik tablosu) görünür.
+- **Maç Sonucu** ve **İlk Golü Atan**: doğru tahmin, seçilen seçeneğin (tüm bahisçilerin
+  ortalaması alınmış — bkz. `odds-source.ts`) puanını kazandırır.
+- **Kesin Skor** (`src/lib/scoring.ts` → `computeScorePoints`), dört kademeli:
+  - **Tam tuttu**: bilinen skorsa gerçek oranın puanı; bilinmiyorsa (ör. 5-0 gibi ekstrem bir
+    skor) bilinen skorlardan kalibre edilmiş bir Poisson modeliyle **"optimum" bir oran**
+    tahmin edilir (`estimateScorePoints`) ve puan ona göre hesaplanır.
+  - **Fark tuttu** (skor değil ama gol farkı/marj aynı — ör. 1-0 dedin, 2-1 bitti): tam puanın
+    **1/5**'i.
+  - **Kısmi** (ne skor ne fark ama ev veya deplasman skorundan biri birebir doğru — ör. 3-1
+    dedin, 5-1 bitti): tam puanın **1/10**'u.
+  - Hiçbiri tutmadıysa 0.
+- **Joker** (`src/lib/joker.ts`): sadece **Galatasaray / Fenerbahçe / Beşiktaş / Trabzonspor**
+  maçlarında (`matches.is_joker_eligible`, takım isminden otomatik tespit edilir), katılımcı
+  başına **haftada bir maçta** kullanılabilir (ISO hafta, ilgili maçın kickoff'una göre). Joker
+  kullanılan tahminin kazandığı toplam puan **3 katına** çıkar.
+  Liderlik tablosu, tüm sonuçlanmış maçlardaki kazanılan puanların (joker dahil) toplamıdır.
 
 ## Yapı
 
@@ -124,15 +142,16 @@ src/
     types.ts               veri modeli
     supabase-admin.ts       service-role Supabase client (sadece sunucu)
     db.ts                    veri erişim katmanı (Supabase sorguları)
-    scoring.ts               oran → puan formülü, kazanan türetme
+    scoring.ts               oran → puan formülü, skor puanlama kademeleri, Poisson tahmini
+    joker.ts                  haftalık joker (GS/FB/BJK/TS tespiti, ISO hafta, x3 çarpan)
     parse.ts                  admin panelindeki toplu oran metinlerini ayrıştırma
     admin-auth.ts / require-admin.ts    admin şifre/oturum
     participant-session.ts                katılımcı oturumu (cookie)
-    odds-source.ts                         gelecekteki canlı API entegrasyon noktası
+    odds-source.ts                         API-Football entegrasyonu (fikstür + oran + sonuç)
   app/
     actions/               Server Actions (participant.ts, predictions.ts, admin.ts)
     giris/                  katılımcı giriş
-    maclar/                  maç listesi + tahmin formu
+    maclar/                  "Maçlar"/"Sonuçlar" sekmeli liste (MatchTabs.tsx) + tahmin formu
     tahminlerim/              kişisel tahmin geçmişi
     liderlik-tablosu/          genel sıralama
     admin/                     admin girişi + panel (maç/oran yönetimi, sonuçlandırma)

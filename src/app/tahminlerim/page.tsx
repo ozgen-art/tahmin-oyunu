@@ -60,6 +60,7 @@ export default async function TahminlerimPage() {
                   )}
                   {pred && phase === "finished" && (
                     <span className="font-semibold text-emerald-600 dark:text-emerald-400">
+                      {pred.jokerUsed && "🃏 "}
                       {points} puan
                     </span>
                   )}

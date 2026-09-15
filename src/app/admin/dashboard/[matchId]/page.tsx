@@ -25,6 +25,11 @@ export default async function AdminMatchPage({
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-bold">
           {match.homeTeam} vs {match.awayTeam}
+          {match.isJokerEligible && (
+            <span className="ml-2 align-middle text-base" title="Joker uygun maç (GS/FB/BJK/TS)">
+              🃏
+            </span>
+          )}
         </h1>
         <DeleteMatchButton matchId={match.id} />
       </div>
@@ -42,7 +47,12 @@ export default async function AdminMatchPage({
         />
       </Section>
 
-      <Section title="Kesin Skor Oranları">
+      <Section title="Kesin Skor Oranları (kullanıcıya gösterilmez)">
+        <p className="-mt-1 text-xs text-black/50 dark:text-white/50">
+          Kullanıcılar artık skoru elle giriyor; bu liste sadece dahili puan hesaplaması için
+          referans/kalibrasyon verisi. Burada olmayan bir skor tahmin edilirse, sistem buradaki
+          oranlardan optimum bir oran kestirip puanı ona göre hesaplar.
+        </p>
         <ScoreOddsForm matchId={match.id} options={match.scoreOptions} />
       </Section>
 

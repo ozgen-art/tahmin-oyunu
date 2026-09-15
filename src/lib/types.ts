@@ -13,6 +13,9 @@ export interface Match {
   awayTeam: string;
   kickoffAt: string; // ISO datetime
   status: MatchStatus;
+  /** Galatasaray / Fenerbahçe / Beşiktaş / Trabzonspor'un oynadığı maç mı —
+   * joker (3 kat puan) sadece bu maçlarda kullanılabilir. */
+  isJokerEligible: boolean;
   finalHomeScore?: number;
   finalAwayScore?: number;
   finalWinner?: Outcome;
@@ -29,6 +32,9 @@ export interface ResultOption {
   points: number;
 }
 
+/** Admin/API tarafından bilinen (gerçek oranlı) "en olası skorlar" listesi.
+ * Kullanıcıya gösterilmez — sadece serbest skor tahminlerinin puanını
+ * hesaplarken referans/kalibrasyon verisi olarak kullanılır. */
 export interface ScoreOption {
   id: string;
   matchId: string;
@@ -60,22 +66,16 @@ export interface Prediction {
   participantId: string;
   matchId: string;
   resultOptionId?: string;
-  scoreOptionId?: string;
+  predictedHomeScore?: number;
+  predictedAwayScore?: number;
   scorerOptionId?: string;
+  /** Bu tahmin için haftalık jokerin kullanılıp kullanılmadığı (puan x3). */
+  jokerUsed: boolean;
   resultPointsEarned?: number;
   scorePointsEarned?: number;
   scorerPointsEarned?: number;
   submittedAt: string;
   updatedAt: string;
-}
-
-export interface DbShape {
-  matches: Match[];
-  resultOptions: ResultOption[];
-  scoreOptions: ScoreOption[];
-  scorerOptions: ScorerOption[];
-  participants: Participant[];
-  predictions: Prediction[];
 }
 
 /** Bir maç için kullanıcıya gösterilecek tüm tahmin seçenekleriyle birlikte hali. */

@@ -1,6 +1,7 @@
 import "server-only";
 import { getSupabaseAdmin } from "./supabase-admin";
-import { deriveWinner } from "./scoring";
+import { computeScorePoints, deriveWinner } from "./scoring";
+import { getIsoWeekKey, isJokerEligibleMatch, JOKER_MULTIPLIER } from "./joker";
 import { sha256Hex, randomToken } from "./hash";
 import type {
   Match,
@@ -26,6 +27,7 @@ interface MatchRow {
   away_team: string;
   kickoff_at: string;
   status: "scheduled" | "finished";
+  is_joker_eligible: boolean;
   final_home_score: number | null;
   final_away_score: number | null;
   final_winner: Outcome | null;
@@ -42,6 +44,7 @@ function mapMatch(row: MatchRow): Match {
     awayTeam: row.away_team,
     kickoffAt: row.kickoff_at,
     status: row.status,
+    isJokerEligible: row.is_joker_eligible,
     finalHomeScore: row.final_home_score ?? undefined,
     finalAwayScore: row.final_away_score ?? undefined,
     finalWinner: row.final_winner ?? undefined,
@@ -120,8 +123,10 @@ interface PredictionRow {
   participant_id: string;
   match_id: string;
   result_option_id: string | null;
-  score_option_id: string | null;
+  predicted_home_score: number | null;
+  predicted_away_score: number | null;
   scorer_option_id: string | null;
+  joker_used: boolean;
   result_points_earned: number | null;
   score_points_earned: number | null;
   scorer_points_earned: number | null;
@@ -133,8 +138,10 @@ const mapPrediction = (row: PredictionRow): Prediction => ({
   participantId: row.participant_id,
   matchId: row.match_id,
   resultOptionId: row.result_option_id ?? undefined,
-  scoreOptionId: row.score_option_id ?? undefined,
+  predictedHomeScore: row.predicted_home_score ?? undefined,
+  predictedAwayScore: row.predicted_away_score ?? undefined,
   scorerOptionId: row.scorer_option_id ?? undefined,
+  jokerUsed: row.joker_used,
   resultPointsEarned: row.result_points_earned ?? undefined,
   scorePointsEarned: row.score_points_earned ?? undefined,
   scorerPointsEarned: row.scorer_points_earned ?? undefined,
@@ -201,6 +208,7 @@ export async function createMatch(input: {
       away_team: input.awayTeam.trim(),
       kickoff_at: new Date(input.kickoffAt).toISOString(),
       external_ref: input.externalRef ?? null,
+      is_joker_eligible: isJokerEligibleMatch(input.homeTeam, input.awayTeam),
     })
     .select("*")
     .single();
@@ -231,6 +239,7 @@ export async function updateMatchInfo(
       home_team: input.homeTeam.trim(),
       away_team: input.awayTeam.trim(),
       kickoff_at: new Date(input.kickoffAt).toISOString(),
+      is_joker_eligible: isJokerEligibleMatch(input.homeTeam, input.awayTeam),
     })
     .eq("id", matchId);
   if (error) throw new Error(error.message);
@@ -335,24 +344,41 @@ export async function finalizeMatch(
   const scorerOptions = (scorerRes.data as ScorerOptionRow[]).map(mapScorerOption);
   const predictions = (predsRes.data as PredictionRow[]).map(mapPrediction);
 
+  const knownScores = scoreOptions.map((o) => ({
+    homeScore: o.homeScore,
+    awayScore: o.awayScore,
+    odds: o.odds,
+  }));
+
   await Promise.all(
     predictions.map((pred) => {
       const resultOpt = resultOptions.find((o) => o.id === pred.resultOptionId);
-      const resultPointsEarned = resultOpt && resultOpt.outcome === winner ? resultOpt.points : 0;
+      let resultPointsEarned = resultOpt && resultOpt.outcome === winner ? resultOpt.points : 0;
 
-      const scoreOpt = scoreOptions.find((o) => o.id === pred.scoreOptionId);
-      const scorePointsEarned =
-        scoreOpt &&
-        scoreOpt.homeScore === input.finalHomeScore &&
-        scoreOpt.awayScore === input.finalAwayScore
-          ? scoreOpt.points
-          : 0;
+      let scorePointsEarned = 0;
+      if (pred.predictedHomeScore !== undefined && pred.predictedAwayScore !== undefined) {
+        scorePointsEarned = computeScorePoints(
+          pred.predictedHomeScore,
+          pred.predictedAwayScore,
+          input.finalHomeScore,
+          input.finalAwayScore,
+          knownScores
+        ).points;
+      }
 
       const scorerOpt = scorerOptions.find((o) => o.id === pred.scorerOptionId);
-      const scorerPointsEarned =
+      let scorerPointsEarned =
         scorerOpt && input.finalScorerOptionId && pred.scorerOptionId === input.finalScorerOptionId
           ? scorerOpt.points
           : 0;
+
+      // Joker: bu maça (sadece GS/FB/BJK/TS maçlarında, haftada bir kez)
+      // jokerini kullandıysa toplam kazandığı puan 3 katına çıkar.
+      if (pred.jokerUsed) {
+        resultPointsEarned *= JOKER_MULTIPLIER;
+        scorePointsEarned *= JOKER_MULTIPLIER;
+        scorerPointsEarned *= JOKER_MULTIPLIER;
+      }
 
       return db
         .from("predictions")
@@ -464,30 +490,72 @@ export async function listPredictionsForParticipant(participantId: string): Prom
   return (data as PredictionRow[]).map(mapPrediction);
 }
 
+/** Katılımcının bu hafta (verilen maçın haftasında) başka bir maçta joker
+ * kullanıp kullanmadığını döner. `excludeMatchId` verilirse o maç hariç
+ * tutulur (aynı maçtaki joker kutusunu açıp kapatabilsin diye). */
+export async function hasUsedJokerThisWeek(
+  participantId: string,
+  weekKey: string,
+  excludeMatchId?: string
+): Promise<boolean> {
+  const db = getSupabaseAdmin();
+  const { data, error } = await db
+    .from("predictions")
+    .select("match_id, matches(kickoff_at)")
+    .eq("participant_id", participantId)
+    .eq("joker_used", true);
+  if (error) throw new Error(error.message);
+
+  type Row = { match_id: string; matches: { kickoff_at: string } | null };
+  return (data as unknown as Row[]).some(
+    (row) =>
+      row.match_id !== excludeMatchId &&
+      row.matches &&
+      getIsoWeekKey(row.matches.kickoff_at) === weekKey
+  );
+}
+
 export async function submitPrediction(input: {
   participantId: string;
   matchId: string;
   resultOptionId?: string;
-  scoreOptionId?: string;
+  predictedHomeScore?: number;
+  predictedAwayScore?: number;
   scorerOptionId?: string;
+  jokerUsed?: boolean;
 }): Promise<void> {
   const db = getSupabaseAdmin();
 
   const { data: matchData, error: matchErr } = await db
     .from("matches")
-    .select("status, kickoff_at")
+    .select("status, kickoff_at, is_joker_eligible")
     .eq("id", input.matchId)
     .maybeSingle();
   if (matchErr) throw new Error(matchErr.message);
-  const match = must(matchData, "Maç bulunamadı") as Pick<MatchRow, "status" | "kickoff_at">;
+  const match = must(matchData, "Maç bulunamadı") as Pick<
+    MatchRow,
+    "status" | "kickoff_at" | "is_joker_eligible"
+  >;
   if (getMatchPhaseSync({ status: match.status, kickoffAt: match.kickoff_at }) !== "open") {
     throw new Error("Bu maç için tahmin süresi doldu");
   }
 
-  const patch: Record<string, string | null> = {};
+  if (input.jokerUsed) {
+    if (!match.is_joker_eligible) {
+      throw new Error("Joker sadece Galatasaray, Fenerbahçe, Beşiktaş veya Trabzonspor maçlarında kullanılabilir.");
+    }
+    const weekKey = getIsoWeekKey(match.kickoff_at);
+    if (await hasUsedJokerThisWeek(input.participantId, weekKey, input.matchId)) {
+      throw new Error("Bu haftaki jokerini zaten başka bir maçta kullandın.");
+    }
+  }
+
+  const patch: Record<string, string | number | boolean | null> = {};
   if (input.resultOptionId !== undefined) patch.result_option_id = input.resultOptionId || null;
-  if (input.scoreOptionId !== undefined) patch.score_option_id = input.scoreOptionId || null;
+  if (input.predictedHomeScore !== undefined) patch.predicted_home_score = input.predictedHomeScore;
+  if (input.predictedAwayScore !== undefined) patch.predicted_away_score = input.predictedAwayScore;
   if (input.scorerOptionId !== undefined) patch.scorer_option_id = input.scorerOptionId || null;
+  if (input.jokerUsed !== undefined) patch.joker_used = input.jokerUsed;
 
   const { data: existing, error: existingErr } = await db
     .from("predictions")
