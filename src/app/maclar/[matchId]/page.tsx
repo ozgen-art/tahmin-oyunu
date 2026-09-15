@@ -17,8 +17,9 @@ export default async function MatchPage({
   if (!match) notFound();
 
   const phase = getMatchPhaseSync(match);
-  // Tahmin girişi artık sadece /maclar'daki sihirbazda yapılıyor.
-  if (phase === "open") redirect("/maclar");
+  // Tahmin girişi/güncellemesi /maclar'daki sihirbazda yapılıyor — bu maçı
+  // düzenleme modunda açması için ?edit= ile yönlendiriyoruz.
+  if (phase === "open") redirect(`/maclar?edit=${matchId}`);
 
   const existing = await getPrediction(participant.id, matchId);
 

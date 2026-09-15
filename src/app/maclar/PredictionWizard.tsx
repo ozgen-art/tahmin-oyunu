@@ -97,15 +97,18 @@ export default function PredictionWizard({
   openMatches,
   lockedMatches,
   finishedMatches,
+  initialEditId,
 }: {
   openMatches: OpenMatchData[];
   lockedMatches: LockedMatchData[];
   finishedMatches: FinishedMatchData[];
+  initialEditId?: string;
 }) {
   const [tab, setTab] = useState<"maclar" | "sonuclar">("maclar");
   const [doneIds, setDoneIds] = useState<Set<string>>(
     () => new Set(openMatches.filter((m) => m.existing).map((m) => m.id))
   );
+  const emptyDraft: DraftState = { home: "", away: "", joker: false };
   const [savedDrafts, setSavedDrafts] = useState<Record<string, DraftState>>(() => {
     const initial: Record<string, DraftState> = {};
     for (const m of openMatches) {
@@ -119,19 +122,45 @@ export default function PredictionWizard({
     }
     return initial;
   });
-  const [draft, setDraft] = useState<DraftState>({ home: "", away: "", joker: false });
+
+  // Aktif (düzenlenen) maç: ?edit= ile belirli bir maç açılmak istenmişse o,
+  // yoksa sırayla ilk tamamlanmamış maç. Kart tıklanarak da değiştirilebilir
+  // — böylece kaydedilmiş bir tahmin geri açılıp güncellenebilir.
+  const firstUndoneId = useMemo(
+    () => openMatches.find((m) => !doneIds.has(m.id))?.id ?? null,
+    [openMatches, doneIds]
+  );
+  const [activeIdOverride, setActiveIdOverride] = useState<string | null>(
+    () => (initialEditId && openMatches.some((m) => m.id === initialEditId) ? initialEditId : null)
+  );
+  const activeId = activeIdOverride ?? firstUndoneId;
+  const currentMatch = useMemo(
+    () => openMatches.find((m) => m.id === activeId) ?? null,
+    [openMatches, activeId]
+  );
+
+  const [draft, setDraft] = useState<DraftState>(
+    () => (currentMatch && savedDrafts[currentMatch.id]) ?? emptyDraft
+  );
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
 
-  const currentMatch = useMemo(
-    () => openMatches.find((m) => !doneIds.has(m.id)) ?? null,
-    [openMatches, doneIds]
-  );
   const doneCount = doneIds.size;
   const total = openMatches.length;
 
+  const [successId, setSuccessId] = useState<string | null>(null);
+
+  function selectMatch(match: OpenMatchData) {
+    setError(null);
+    setSuccessId(null);
+    setActiveIdOverride(match.id);
+    setDraft(savedDrafts[match.id] ?? emptyDraft);
+  }
+
   function handleSave(match: OpenMatchData) {
     setError(null);
+    setSuccessId(null);
+    const wasAlreadyDone = doneIds.has(match.id);
     const fd = new FormData();
     fd.set("matchId", match.id);
     if (draft.home !== "" || draft.away !== "") {
@@ -148,7 +177,23 @@ export default function PredictionWizard({
       }
       setSavedDrafts((prev) => ({ ...prev, [match.id]: draft }));
       setDoneIds((prev) => new Set(prev).add(match.id));
-      setDraft({ home: "", away: "", joker: false });
+
+      if (wasAlreadyDone) {
+        // Var olan bir tahmin güncellendi — kullanıcıyı başka bir maça
+        // savurmadan burada bırak, güncellendiğini göster.
+        setSuccessId(match.id);
+        return;
+      }
+      // İlk kez giriliyordu: sıradaki tamamlanmamış maça geç; hepsi tamamsa
+      // bu kartta kal.
+      const nextUndone = openMatches.find((m) => m.id !== match.id && !doneIds.has(m.id));
+      if (nextUndone) {
+        setActiveIdOverride(nextUndone.id);
+        setDraft(savedDrafts[nextUndone.id] ?? emptyDraft);
+      } else {
+        setActiveIdOverride(match.id);
+        setDraft(draft);
+      }
     });
   }
 
@@ -192,39 +237,19 @@ export default function PredictionWizard({
               const isActive = currentMatch?.id === m.id;
               const isNext = !isActive && !isDone && openMatches.findIndex((x) => !doneIds.has(x.id)) + 1 === i;
 
-              if (isDone) {
-                const saved = savedDrafts[m.id];
-                return (
-                  <div key={m.id} className="p-card done">
-                    <div className="p-done-row">
-                      <div>
-                        <div className="p-done-teams">
-                          <span>{m.homeTeam}</span>
-                          <span className="p-muted">vs</span>
-                          <span>{m.awayTeam}</span>
-                          {saved?.joker && <span title="Joker kullanıldı">🃏</span>}
-                        </div>
-                      </div>
-                      <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                        {saved && (saved.home !== "" || saved.away !== "") && (
-                          <span className="p-done-score">
-                            {saved.home || 0} : {saved.away || 0}
-                          </span>
-                        )}
-                        <span className="p-done-check">✓</span>
-                      </div>
-                    </div>
-                  </div>
-                );
-              }
-
               if (isActive) {
+                const isEditing = isDone;
                 return (
                   <div key={m.id} className="p-card active">
                     <div className="p-match-meta">
                       <span>{COMPETITION_LABEL[m.competition]}</span>
                       <span className="p-kickoff">{formatKickoff(m.kickoffAt)}</span>
                     </div>
+                    {isEditing && (
+                      <p className="p-muted" style={{ fontSize: 12, marginTop: -6, marginBottom: 4 }}>
+                        Bu maç için tahminini düzenliyorsun.
+                      </p>
+                    )}
                     <div className="p-teams-row">
                       <div className="p-team">
                         <Crest name={m.homeTeam} logoUrl={m.homeLogoUrl} />
@@ -280,6 +305,11 @@ export default function PredictionWizard({
                     )}
 
                     {error && <p className="p-error" style={{ marginTop: 10 }}>{error}</p>}
+                    {successId === m.id && (
+                      <p style={{ marginTop: 10, fontSize: 13, color: "var(--p-teal)" }}>
+                        Tahminin güncellendi ✓
+                      </p>
+                    )}
 
                     <button
                       type="button"
@@ -287,20 +317,70 @@ export default function PredictionWizard({
                       disabled={pending}
                       onClick={() => handleSave(m)}
                     >
-                      {pending ? "Kaydediliyor…" : "Tahmini Kaydet"}
+                      {pending ? "Kaydediliyor…" : isEditing ? "Güncelle" : "Tahmini Kaydet"}
                     </button>
                   </div>
                 );
               }
 
+              if (isDone) {
+                const saved = savedDrafts[m.id];
+                return (
+                  <div
+                    key={m.id}
+                    className="p-card done"
+                    role="button"
+                    tabIndex={0}
+                    onClick={() => selectMatch(m)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter" || e.key === " ") selectMatch(m);
+                    }}
+                    style={{ cursor: "pointer" }}
+                    title="Tahminini güncellemek için dokun"
+                  >
+                    <div className="p-done-row">
+                      <div>
+                        <div className="p-done-teams">
+                          <span>{m.homeTeam}</span>
+                          <span className="p-muted">vs</span>
+                          <span>{m.awayTeam}</span>
+                          {saved?.joker && <span title="Joker kullanıldı">🃏</span>}
+                        </div>
+                      </div>
+                      <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                        {saved && (saved.home !== "" || saved.away !== "") && (
+                          <span className="p-done-score">
+                            {saved.home || 0} : {saved.away || 0}
+                          </span>
+                        )}
+                        <span className="p-done-check">✓</span>
+                      </div>
+                    </div>
+                  </div>
+                );
+              }
+
               return (
-                <div key={m.id} className="p-card locked">
+                <div
+                  key={m.id}
+                  className="p-card locked"
+                  role="button"
+                  tabIndex={0}
+                  onClick={() => selectMatch(m)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" || e.key === " ") selectMatch(m);
+                  }}
+                  style={{ cursor: "pointer" }}
+                  title="Bu maç için tahmin girmek üzere dokun"
+                >
                   {isNext && <span className="p-up-next-tag">Sırada</span>}
                   <div className="p-lock-row">
                     <span>
                       {m.homeTeam} vs {m.awayTeam}
                     </span>
-                    <span className="p-lock-icon">🔒</span>
+                    <span className="p-muted" style={{ fontSize: 12 }}>
+                      Tahmin et →
+                    </span>
                   </div>
                 </div>
               );

@@ -14,9 +14,14 @@ import PredictionWizard, {
   type OpenMatchData,
 } from "./PredictionWizard";
 
-export default async function MaclarPage() {
+export default async function MaclarPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ edit?: string }>;
+}) {
   const participant = await getCurrentParticipant();
   if (!participant) redirect("/giris");
+  const { edit: editMatchId } = await searchParams;
 
   const [matches, predictions] = await Promise.all([
     listMatches(),
@@ -110,6 +115,7 @@ export default async function MaclarPage() {
         openMatches={openMatches}
         lockedMatches={lockedMatches}
         finishedMatches={finishedMatches}
+        initialEditId={editMatchId}
       />
     </ParticipantShell>
   );
