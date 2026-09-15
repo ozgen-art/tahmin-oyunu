@@ -1,16 +1,17 @@
 import type { Metadata } from "next";
-import { Geist, Geist_Mono } from "next/font/google";
-import Header from "@/components/Header";
+import { Sora, Inter } from "next/font/google";
 import "./globals.css";
 
-const geistSans = Geist({
-  variable: "--font-geist-sans",
+const sora = Sora({
+  variable: "--font-sora",
   subsets: ["latin"],
+  weight: ["500", "600", "700", "800"],
 });
 
-const geistMono = Geist_Mono({
-  variable: "--font-geist-mono",
+const inter = Inter({
+  variable: "--font-inter",
   subsets: ["latin"],
+  weight: ["400", "500", "600", "700"],
 });
 
 export const metadata: Metadata = {
@@ -21,18 +22,8 @@ export const metadata: Metadata = {
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
-    <html
-      lang="tr"
-      className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
-    >
-      <body className="min-h-full flex flex-col bg-white text-neutral-900 dark:bg-neutral-950 dark:text-neutral-100">
-        <Header />
-        <main className="mx-auto w-full max-w-4xl flex-1 px-4 py-8">{children}</main>
-        <footer className="mx-auto w-full max-w-4xl px-4 py-6 text-xs text-black/50 dark:text-white/40">
-          Sadece UEFA Şampiyonlar Ligi ve UEFA Avrupa Ligi maçları · Puanlar bahis oranlarından
-          türetilir (oran × 10, tam sayıya yuvarlanır).
-        </footer>
-      </body>
+    <html lang="tr" className={`${sora.variable} ${inter.variable} h-full antialiased`}>
+      <body className="min-h-full bg-[#0c0a1a] text-[#f6f3ff]">{children}</body>
     </html>
   );
 }

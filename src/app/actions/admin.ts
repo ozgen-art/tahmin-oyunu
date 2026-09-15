@@ -264,6 +264,8 @@ export async function importMatchesFromApiAction(
         awayTeam: em.awayTeam,
         kickoffAt: em.kickoffAt,
         externalRef: em.externalId,
+        homeLogoUrl: em.homeLogoUrl,
+        awayLogoUrl: em.awayLogoUrl,
       });
       matchId = match.id;
       created += 1;

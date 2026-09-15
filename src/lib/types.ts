@@ -16,6 +16,9 @@ export interface Match {
   /** Galatasaray / Fenerbahçe / Beşiktaş / Trabzonspor'un oynadığı maç mı —
    * joker (3 kat puan) sadece bu maçlarda kullanılabilir. */
   isJokerEligible: boolean;
+  /** API-Football'dan gelen forma/logo görseli — yoksa arayüz baş harf rozetine düşer. */
+  homeLogoUrl?: string;
+  awayLogoUrl?: string;
   finalHomeScore?: number;
   finalAwayScore?: number;
   finalWinner?: Outcome;

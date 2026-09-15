@@ -28,6 +28,8 @@ interface MatchRow {
   kickoff_at: string;
   status: "scheduled" | "finished";
   is_joker_eligible: boolean;
+  home_logo_url: string | null;
+  away_logo_url: string | null;
   final_home_score: number | null;
   final_away_score: number | null;
   final_winner: Outcome | null;
@@ -45,6 +47,8 @@ function mapMatch(row: MatchRow): Match {
     kickoffAt: row.kickoff_at,
     status: row.status,
     isJokerEligible: row.is_joker_eligible,
+    homeLogoUrl: row.home_logo_url ?? undefined,
+    awayLogoUrl: row.away_logo_url ?? undefined,
     finalHomeScore: row.final_home_score ?? undefined,
     finalAwayScore: row.final_away_score ?? undefined,
     finalWinner: row.final_winner ?? undefined,
@@ -198,6 +202,8 @@ export async function createMatch(input: {
   awayTeam: string;
   kickoffAt: string;
   externalRef?: string;
+  homeLogoUrl?: string;
+  awayLogoUrl?: string;
 }): Promise<Match> {
   const db = getSupabaseAdmin();
   const { data, error } = await db
@@ -208,6 +214,8 @@ export async function createMatch(input: {
       away_team: input.awayTeam.trim(),
       kickoff_at: new Date(input.kickoffAt).toISOString(),
       external_ref: input.externalRef ?? null,
+      home_logo_url: input.homeLogoUrl ?? null,
+      away_logo_url: input.awayLogoUrl ?? null,
       is_joker_eligible: isJokerEligibleMatch(input.homeTeam, input.awayTeam),
     })
     .select("*")
@@ -518,7 +526,6 @@ export async function hasUsedJokerThisWeek(
 export async function submitPrediction(input: {
   participantId: string;
   matchId: string;
-  resultOptionId?: string;
   predictedHomeScore?: number;
   predictedAwayScore?: number;
   scorerOptionId?: string;
@@ -551,9 +558,21 @@ export async function submitPrediction(input: {
   }
 
   const patch: Record<string, string | number | boolean | null> = {};
-  if (input.resultOptionId !== undefined) patch.result_option_id = input.resultOptionId || null;
-  if (input.predictedHomeScore !== undefined) patch.predicted_home_score = input.predictedHomeScore;
-  if (input.predictedAwayScore !== undefined) patch.predicted_away_score = input.predictedAwayScore;
+  if (input.predictedHomeScore !== undefined && input.predictedAwayScore !== undefined) {
+    patch.predicted_home_score = input.predictedHomeScore;
+    patch.predicted_away_score = input.predictedAwayScore;
+    // "Maç Sonucu" artık ayrıca sorulmuyor — girilen skordan otomatik türetilir.
+    const { data: resultOpts, error: resultErr } = await db
+      .from("result_options")
+      .select("id, outcome")
+      .eq("match_id", input.matchId);
+    if (resultErr) throw new Error(resultErr.message);
+    const winner = deriveWinner(input.predictedHomeScore, input.predictedAwayScore);
+    const matchingOpt = (resultOpts as Array<{ id: string; outcome: Outcome }>).find(
+      (o) => o.outcome === winner
+    );
+    patch.result_option_id = matchingOpt?.id ?? null;
+  }
   if (input.scorerOptionId !== undefined) patch.scorer_option_id = input.scorerOptionId || null;
   if (input.jokerUsed !== undefined) patch.joker_used = input.jokerUsed;
 

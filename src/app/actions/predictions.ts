@@ -1,7 +1,6 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { redirect } from "next/navigation";
 import { submitPrediction } from "@/lib/db";
 import { getCurrentParticipant } from "@/lib/participant-session";
 
@@ -16,6 +15,12 @@ function parseScoreInput(raw: string): number | undefined {
   return Number.isInteger(n) && n >= 0 && n <= 20 ? n : NaN;
 }
 
+/**
+ * Not: Bu action artık bir <form action={...}> ile değil, yeni tahmin
+ * sihirbazından (PredictionWizard) FormData oluşturup doğrudan çağrılıyor —
+ * bu yüzden başarıda sayfa yönlendirmesi yapmıyor, sadece {success:true}
+ * döner; sihirbaz sıradaki maça kendi içinde (sayfa yenilemeden) geçiyor.
+ */
 export async function submitPredictionAction(
   _prevState: PredictionActionState,
   formData: FormData
@@ -28,7 +33,6 @@ export async function submitPredictionAction(
   const matchId = String(formData.get("matchId") ?? "");
   if (!matchId) return { error: "Geçersiz maç." };
 
-  const resultOptionId = String(formData.get("resultOptionId") ?? "") || undefined;
   const scorerOptionId = String(formData.get("scorerOptionId") ?? "") || undefined;
   const jokerUsed = formData.get("jokerUsed") === "on";
 
@@ -44,15 +48,14 @@ export async function submitPredictionAction(
     return { error: "Skor için hem ev sahibi hem deplasman skorunu girin." };
   }
 
-  if (!resultOptionId && predictedHomeScore === undefined && !scorerOptionId) {
-    return { error: "En az bir tahmin kategorisi doldurmalısınız." };
+  if (predictedHomeScore === undefined && !scorerOptionId) {
+    return { error: "En az skoru veya ilk golü atan oyuncuyu tahmin etmelisin." };
   }
 
   try {
     await submitPrediction({
       participantId: participant.id,
       matchId,
-      resultOptionId,
       predictedHomeScore,
       predictedAwayScore,
       scorerOptionId,
@@ -66,5 +69,5 @@ export async function submitPredictionAction(
   revalidatePath("/maclar");
   revalidatePath("/tahminlerim");
   revalidatePath("/liderlik-tablosu");
-  redirect("/maclar");
+  return { success: true };
 }

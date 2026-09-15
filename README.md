@@ -1,11 +1,16 @@
 # UCL · UEL Tahmin Yarışması
 
 Sadece **UEFA Şampiyonlar Ligi** ve **UEFA Avrupa Ligi** maçları için çalışan bir web tahmin
-yarışması. Katılımcılar her maç için üç kategoride tahmin yapar:
+yarışması. "Premium Tahmin" temalı (koyu/altın renkli, Sora+Inter fontlu) katılımcı arayüzü,
+`/maclar`'da haftalık maçları **tek tek, sırayla** tahmin ettiren bir sihirbaz (bkz.
+`src/app/maclar/PredictionWizard.tsx`) şeklinde çalışır — admin paneli ise kasıtlı olarak sade/nötr
+bırakıldı (`src/app/admin/layout.tsx`).
 
-1. **Maç Sonucu** (1 / Berabere / 2) — listeden seçilir
-2. **Kesin Skor** — elle girilir (ör. "3-2"), listeden seçilmez
-3. **İlk Golü Atan Oyuncu** — listeden seçilir
+Katılımcılar her maç için iki kategoride tahmin yapar:
+
+1. **Kesin Skor** — elle girilir (ör. "3-2"); **Maç Sonucu (1/Berabere/2) girilen skordan otomatik
+   türetilir**, ayrıca sorulmaz.
+2. **İlk Golü Atan Oyuncu** — listeden (çip olarak) seçilir.
 
 **Oranlar ve puanlar katılımcıya hiç gösterilmez.** Tahminler kör olarak girilir; puan
 hesaplaması tamamen arka planda yapılır (bkz. [Puanlama mantığı özeti](#puanlama-mantığı-özeti)).
@@ -147,12 +152,18 @@ src/
     parse.ts                  admin panelindeki toplu oran metinlerini ayrıştırma
     admin-auth.ts / require-admin.ts    admin şifre/oturum
     participant-session.ts                katılımcı oturumu (cookie)
-    odds-source.ts                         API-Football entegrasyonu (fikstür + oran + sonuç)
+    odds-source.ts                         API-Football entegrasyonu (fikstür + oran + sonuç + logo)
+    team-visuals.ts                         logo yoksa baş harf rozeti + deterministik gradyan
+  components/
+    ParticipantShell.tsx    katılımcı sayfalarının ortak koyu tema kabuğu (topbar + nav + avatar)
   app/
+    globals.css              Tailwind + "Premium Tahmin" tema değişkenleri/sınıfları (.p-*)
     actions/               Server Actions (participant.ts, predictions.ts, admin.ts)
     giris/                  katılımcı giriş
-    maclar/                  "Maçlar"/"Sonuçlar" sekmeli liste (MatchTabs.tsx) + tahmin formu
+    maclar/                  PredictionWizard.tsx — haftanın maçlarını sırayla tahmin ettiren
+                              sihirbaz ("Maçlar"/"Sonuçlar" sekmeleri, ilerleme çubuğu)
     tahminlerim/              kişisel tahmin geçmişi
     liderlik-tablosu/          genel sıralama
-    admin/                     admin girişi + panel (maç/oran yönetimi, sonuçlandırma)
+    admin/                     admin girişi + panel — kendi layout.tsx'i ile sade/nötr tema
+                                (maç/oran yönetimi, sonuçlandırma)
 ```

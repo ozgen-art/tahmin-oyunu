@@ -22,6 +22,8 @@ export interface ExternalMatch {
   competition: Competition;
   homeTeam: string;
   awayTeam: string;
+  homeLogoUrl?: string;
+  awayLogoUrl?: string;
   kickoffAt: string; // ISO datetime
   result1x2Odds: { home: number; draw: number; away: number } | null;
   correctScoreOdds: Array<{ homeScore: number; awayScore: number; odds: number }>;
@@ -63,7 +65,7 @@ async function apiFootballGet(path: string, params: Record<string, string>) {
 interface RawFixture {
   fixture: { id: number; date: string; status: { short: string } };
   league: { id: number };
-  teams: { home: { name: string }; away: { name: string } };
+  teams: { home: { name: string; logo?: string }; away: { name: string; logo?: string } };
 }
 
 async function fetchFixturesForDate(date: string): Promise<RawFixture[]> {
@@ -278,6 +280,8 @@ export async function fetchUpcomingMatchesFromLiveApi(): Promise<ExternalMatch[]
       competition: LEAGUE_IDS[f.league.id],
       homeTeam: f.teams.home.name,
       awayTeam: f.teams.away.name,
+      homeLogoUrl: f.teams.home.logo,
+      awayLogoUrl: f.teams.away.logo,
       kickoffAt: f.fixture.date,
       ...odds,
     });

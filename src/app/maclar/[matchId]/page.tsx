@@ -1,14 +1,8 @@
 import { notFound, redirect } from "next/navigation";
-import { getMatchPhaseSync, getMatchWithOptions, getPrediction, hasUsedJokerThisWeek } from "@/lib/db";
-import { getIsoWeekKey } from "@/lib/joker";
+import { getMatchPhaseSync, getMatchWithOptions, getPrediction } from "@/lib/db";
 import { getCurrentParticipant } from "@/lib/participant-session";
-import PredictionForm from "./PredictionForm";
+import ParticipantShell from "@/components/ParticipantShell";
 import PredictionSummary from "./PredictionSummary";
-
-const COMPETITION_LABEL: Record<string, string> = {
-  UCL: "UEFA Şampiyonlar Ligi",
-  UEL: "UEFA Avrupa Ligi",
-};
 
 export default async function MatchPage({
   params,
@@ -22,49 +16,32 @@ export default async function MatchPage({
   const match = await getMatchWithOptions(matchId);
   if (!match) notFound();
 
-  const existing = await getPrediction(participant.id, matchId);
   const phase = getMatchPhaseSync(match);
+  // Tahmin girişi artık sadece /maclar'daki sihirbazda yapılıyor.
+  if (phase === "open") redirect("/maclar");
 
-  let jokerAvailableThisWeek = false;
-  if (match.isJokerEligible && phase === "open") {
-    const alreadyUsedElsewhere = await hasUsedJokerThisWeek(
-      participant.id,
-      getIsoWeekKey(match.kickoffAt),
-      matchId
-    );
-    jokerAvailableThisWeek = !alreadyUsedElsewhere;
-  }
+  const existing = await getPrediction(participant.id, matchId);
 
   return (
-    <div className="flex flex-col gap-6">
-      <div>
-        <span className="text-xs font-semibold text-indigo-700 dark:text-indigo-300">
-          {COMPETITION_LABEL[match.competition]}
+    <ParticipantShell activeNav="maclar">
+      <div style={{ marginBottom: 20 }}>
+        <span className="p-scorer-label">
+          {match.competition === "UCL" ? "UEFA Şampiyonlar Ligi" : "UEFA Avrupa Ligi"}
         </span>
-        <h1 className="text-2xl font-bold">
-          {match.homeTeam} <span className="text-black/40 dark:text-white/40">vs</span>{" "}
-          {match.awayTeam}
+        <h1 className="p-greeting" style={{ marginTop: 4 }}>
+          {match.homeTeam} <span className="p-muted">vs</span> {match.awayTeam}
         </h1>
-        <p className="text-sm text-black/60 dark:text-white/60">
+        <p className="p-subtitle" style={{ marginBottom: 4 }}>
           {new Date(match.kickoffAt).toLocaleString("tr-TR", { dateStyle: "full", timeStyle: "short" })}
         </p>
         {match.status === "finished" && (
-          <p className="mt-2 text-lg font-semibold">
+          <p style={{ fontFamily: "var(--font-sora)", fontWeight: 700, fontSize: 18 }}>
             Maç Sonucu: {match.homeTeam} {match.finalHomeScore}-{match.finalAwayScore}{" "}
             {match.awayTeam}
           </p>
         )}
       </div>
-
-      {phase === "open" ? (
-        <PredictionForm
-          match={match}
-          existing={existing}
-          jokerAvailableThisWeek={jokerAvailableThisWeek}
-        />
-      ) : (
-        <PredictionSummary match={match} existing={existing} />
-      )}
-    </div>
+      <PredictionSummary match={match} existing={existing} />
+    </ParticipantShell>
   );
 }

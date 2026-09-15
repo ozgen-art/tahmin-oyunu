@@ -13,7 +13,7 @@ export default function PredictionSummary({
 
   if (!existing) {
     return (
-      <p className="text-black/60 dark:text-white/60">
+      <p className="p-muted" style={{ fontSize: 14 }}>
         Bu maç için tahmin girmemişsin{finished ? "; bu maçtan puan alamayacaksın." : "."}
       </p>
     );
@@ -58,45 +58,60 @@ export default function PredictionSummary({
   return (
     <div className="flex flex-col gap-3">
       {existing.jokerUsed && (
-        <p className="w-fit rounded bg-amber-400/15 px-3 py-1 text-sm font-medium text-amber-700 dark:text-amber-400">
+        <p
+          style={{
+            width: "fit-content",
+            borderRadius: 8,
+            padding: "4px 12px",
+            fontSize: 13,
+            fontWeight: 600,
+            background: "rgba(227,179,92,0.15)",
+            color: "var(--p-gold-soft)",
+          }}
+        >
           🃏 Bu maçta jokerini kullandın — puanların 3 katına çıktı.
         </p>
       )}
       {finished && (
-        <p className="text-lg font-semibold">
-          Bu maçtan kazandığın puan: <span className="text-indigo-600 dark:text-indigo-400">{total}</span>
+        <p style={{ fontFamily: "var(--font-sora)", fontWeight: 700, fontSize: 18 }}>
+          Bu maçtan kazandığın puan: <span style={{ color: "var(--p-gold-soft)" }}>{total}</span>
         </p>
       )}
-      <table className="w-full border-collapse overflow-hidden rounded-lg border border-black/10 text-sm dark:border-white/15">
-        <thead>
-          <tr className="bg-black/5 dark:bg-white/5">
-            <th className="px-3 py-2 text-left">Kategori</th>
-            <th className="px-3 py-2 text-left">Tahminin</th>
-            {finished && <th className="px-3 py-2 text-right">Puan</th>}
-          </tr>
-        </thead>
-        <tbody>
-          {rows.map((row) => (
-            <tr key={row.label} className="border-t border-black/10 dark:border-white/10">
-              <td className="px-3 py-2 text-black/60 dark:text-white/60">{row.label}</td>
-              <td className="px-3 py-2">{row.value}</td>
-              {finished && (
-                <td
-                  className={`px-3 py-2 text-right font-medium ${
-                    (row.points ?? 0) > 0
-                      ? "text-emerald-600 dark:text-emerald-400"
-                      : "text-black/40 dark:text-white/40"
-                  }`}
-                >
-                  {row.value === "—" ? "—" : (row.points ?? 0)}
-                </td>
-              )}
+      <div className="p-card" style={{ padding: 0, overflow: "hidden" }}>
+        <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13.5 }}>
+          <thead>
+            <tr style={{ background: "rgba(255,255,255,0.05)" }}>
+              <th style={{ padding: "10px 14px", textAlign: "left" }}>Kategori</th>
+              <th style={{ padding: "10px 14px", textAlign: "left" }}>Tahminin</th>
+              {finished && <th style={{ padding: "10px 14px", textAlign: "right" }}>Puan</th>}
             </tr>
-          ))}
-        </tbody>
-      </table>
+          </thead>
+          <tbody>
+            {rows.map((row) => (
+              <tr key={row.label} style={{ borderTop: "1px solid rgba(255,255,255,0.08)" }}>
+                <td className="p-muted" style={{ padding: "10px 14px" }}>
+                  {row.label}
+                </td>
+                <td style={{ padding: "10px 14px" }}>{row.value}</td>
+                {finished && (
+                  <td
+                    style={{
+                      padding: "10px 14px",
+                      textAlign: "right",
+                      fontWeight: 600,
+                      color: (row.points ?? 0) > 0 ? "var(--p-teal)" : "var(--p-text-muted)",
+                    }}
+                  >
+                    {row.value === "—" ? "—" : (row.points ?? 0)}
+                  </td>
+                )}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
       {!finished && (
-        <p className="text-sm text-black/50 dark:text-white/50">
+        <p className="p-muted" style={{ fontSize: 13 }}>
           Maç kilitlendi, tahminler artık değiştirilemez. Sonuç girildiğinde puanların burada
           görünecek.
         </p>

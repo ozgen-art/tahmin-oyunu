@@ -1,48 +1,56 @@
 import { getLeaderboard } from "@/lib/db";
 import { getCurrentParticipant } from "@/lib/participant-session";
+import ParticipantShell from "@/components/ParticipantShell";
 
 export default async function LiderlikTablosuPage() {
   const [rows, participant] = await Promise.all([getLeaderboard(), getCurrentParticipant()]);
 
   return (
-    <div className="flex flex-col gap-6">
-      <h1 className="text-2xl font-bold">Liderlik Tablosu</h1>
+    <ParticipantShell activeNav="liderlik">
+      <h1 className="p-greeting">Liderlik Tablosu</h1>
       {rows.length === 0 ? (
-        <p className="text-black/60 dark:text-white/60">Henüz kimse tahmin yapmadı.</p>
+        <p className="p-muted" style={{ fontSize: 14 }}>
+          Henüz kimse tahmin yapmadı.
+        </p>
       ) : (
-        <table className="w-full border-collapse overflow-hidden rounded-lg border border-black/10 text-sm dark:border-white/15">
-          <thead>
-            <tr className="bg-black/5 dark:bg-white/5">
-              <th className="px-3 py-2 text-left">#</th>
-              <th className="px-3 py-2 text-left">İsim</th>
-              <th className="px-3 py-2 text-right">Puan</th>
-              <th className="px-3 py-2 text-right">Sonuçlanan Maç</th>
-            </tr>
-          </thead>
-          <tbody>
-            {rows.map((row, i) => (
-              <tr
-                key={row.participantId}
-                className={`border-t border-black/10 dark:border-white/10 ${
-                  row.participantId === participant?.id ? "bg-indigo-600/5" : ""
-                }`}
-              >
-                <td className="px-3 py-2">{i + 1}</td>
-                <td className="px-3 py-2 font-medium">
-                  {row.displayName}
-                  {row.participantId === participant?.id && (
-                    <span className="ml-2 text-xs text-indigo-600 dark:text-indigo-400">(sen)</span>
-                  )}
-                </td>
-                <td className="px-3 py-2 text-right font-semibold">{row.totalPoints}</td>
-                <td className="px-3 py-2 text-right text-black/50 dark:text-white/50">
-                  {row.matchesFinished}
-                </td>
+        <div className="p-card" style={{ padding: 0, overflow: "hidden", marginTop: 12 }}>
+          <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13.5 }}>
+            <thead>
+              <tr style={{ background: "rgba(255,255,255,0.05)" }}>
+                <th style={{ padding: "10px 14px", textAlign: "left" }}>#</th>
+                <th style={{ padding: "10px 14px", textAlign: "left" }}>İsim</th>
+                <th style={{ padding: "10px 14px", textAlign: "right" }}>Puan</th>
+                <th style={{ padding: "10px 14px", textAlign: "right" }}>Maç</th>
               </tr>
-            ))}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {rows.map((row, i) => (
+                <tr
+                  key={row.participantId}
+                  style={{
+                    borderTop: "1px solid rgba(255,255,255,0.08)",
+                    background: row.participantId === participant?.id ? "rgba(227,179,92,0.08)" : undefined,
+                  }}
+                >
+                  <td style={{ padding: "10px 14px" }}>{i + 1}</td>
+                  <td style={{ padding: "10px 14px", fontWeight: 600 }}>
+                    {row.displayName}
+                    {row.participantId === participant?.id && (
+                      <span style={{ marginLeft: 6, fontSize: 11, color: "var(--p-gold-soft)" }}>(sen)</span>
+                    )}
+                  </td>
+                  <td style={{ padding: "10px 14px", textAlign: "right", fontWeight: 700, color: "var(--p-gold-soft)" }}>
+                    {row.totalPoints}
+                  </td>
+                  <td className="p-muted" style={{ padding: "10px 14px", textAlign: "right" }}>
+                    {row.matchesFinished}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       )}
-    </div>
+    </ParticipantShell>
   );
 }

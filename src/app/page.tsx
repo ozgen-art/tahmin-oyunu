@@ -1,71 +1,69 @@
 import Link from "next/link";
 import { getCurrentParticipant } from "@/lib/participant-session";
+import ParticipantShell from "@/components/ParticipantShell";
 
 export default async function HomePage() {
   const participant = await getCurrentParticipant();
 
   return (
-    <div className="flex flex-col gap-10">
-      <section className="flex flex-col gap-4">
-        <span className="w-fit rounded-full bg-indigo-600/10 px-3 py-1 text-xs font-semibold text-indigo-700 dark:text-indigo-300">
-          UEFA Şampiyonlar Ligi &amp; UEFA Avrupa Ligi
-        </span>
-        <h1 className="text-3xl font-bold tracking-tight sm:text-4xl">
-          Maçları tahmin et, puan topla, liderlik tablosunda zirveye oyna.
-        </h1>
-        <p className="max-w-2xl text-black/70 dark:text-white/70">
-          Her maç için üç kategoride tahmin yapıyorsun: <strong>maç sonucu</strong> (1 / Berabere / 2),{" "}
-          <strong>kesin skor</strong> ve <strong>ilk golü atan oyuncu</strong>. Her seçeneğin puanı,
-          o seçeneğin bahis oranından türetilir — riskli tahmin, yüksek puan getirir.
-        </p>
-        <div className="flex flex-wrap gap-3">
-          {participant ? (
-            <Link
-              href="/maclar"
-              className="rounded bg-indigo-600 px-4 py-2 font-medium text-white hover:bg-indigo-700"
-            >
-              Maçlara git
-            </Link>
-          ) : (
-            <Link
-              href="/giris"
-              className="rounded bg-indigo-600 px-4 py-2 font-medium text-white hover:bg-indigo-700"
-            >
-              İsim ve PIN ile başla
-            </Link>
-          )}
-          <Link
-            href="/liderlik-tablosu"
-            className="rounded border border-black/15 px-4 py-2 font-medium hover:bg-black/5 dark:border-white/20 dark:hover:bg-white/10"
-          >
-            Liderlik tablosuna bak
+    <ParticipantShell>
+      <h1 className="p-greeting">
+        Maçları tahmin et, <span>puan topla</span>
+      </h1>
+      <p className="p-subtitle">
+        UEFA Şampiyonlar Ligi &amp; UEFA Avrupa Ligi maçları için skor ve ilk gol tahmini yap —
+        oranları görmeden, kör tahmin. Her hafta bir maçta jokerini kullanıp puanını 3&apos;e
+        katlayabilirsin.
+      </p>
+
+      <div className="flex flex-wrap gap-3" style={{ marginBottom: 28 }}>
+        {participant ? (
+          <Link href="/maclar" className="p-save-btn" style={{ width: "auto", padding: "12px 22px" }}>
+            Maçlara git
           </Link>
+        ) : (
+          <Link href="/giris" className="p-save-btn" style={{ width: "auto", padding: "12px 22px" }}>
+            İsim ve PIN ile başla
+          </Link>
+        )}
+        <Link
+          href="/liderlik-tablosu"
+          className="p-input"
+          style={{ display: "inline-flex", alignItems: "center", textDecoration: "none" }}
+        >
+          Liderlik tablosu
+        </Link>
+      </div>
+
+      <div className="p-match-list">
+        <div className="p-card">
+          <p className="p-scorer-label" style={{ marginBottom: 4 }}>
+            Nasıl oynanır
+          </p>
+          <p style={{ fontSize: 14, lineHeight: 1.5 }}>
+            Her maç için elle bir skor gir ve (varsa) ilk golü kimin atacağını seç. Oranları hiç
+            görmezsin — puanların maç bittikten sonra <Link href="/tahminlerim" className="underline">Tahminlerim</Link>{" "}
+            sayfasında açılır.
+          </p>
         </div>
-      </section>
-
-      <section className="grid gap-4 sm:grid-cols-3">
-        <RuleCard
-          title="Puanlama"
-          body="Puan = oran × 10, tam sayıya yuvarlanır. Örn. oran 1.30 → 13 puan, oran 10.00 → 100 puan."
-        />
-        <RuleCard
-          title="Kilitlenme"
-          body="Bir maça ilk düdükten (başlama saatinden) sonra tahmin girilemez veya değiştirilemez."
-        />
-        <RuleCard
-          title="Puan hesaplama"
-          body="Maç bittiğinde her kategori ayrı ayrı değerlendirilir; doğru tahminin puanı, seçtiğin seçeneğin puanıdır."
-        />
-      </section>
-    </div>
-  );
-}
-
-function RuleCard({ title, body }: { title: string; body: string }) {
-  return (
-    <div className="rounded-lg border border-black/10 p-4 dark:border-white/15">
-      <h2 className="mb-1 font-semibold">{title}</h2>
-      <p className="text-sm text-black/70 dark:text-white/70">{body}</p>
-    </div>
+        <div className="p-card">
+          <p className="p-scorer-label" style={{ marginBottom: 4 }}>
+            🃏 Haftalık joker
+          </p>
+          <p style={{ fontSize: 14, lineHeight: 1.5 }}>
+            Galatasaray, Fenerbahçe, Beşiktaş veya Trabzonspor&apos;un oynadığı bir maçta haftada
+            bir kez joker kullanabilirsin — o maçtan kazandığın puan 3 katına çıkar.
+          </p>
+        </div>
+        <div className="p-card">
+          <p className="p-scorer-label" style={{ marginBottom: 4 }}>
+            Kilitlenme
+          </p>
+          <p style={{ fontSize: 14, lineHeight: 1.5 }}>
+            Bir maça başlama saatinden sonra tahmin girilemez ya da değiştirilemez.
+          </p>
+        </div>
+      </div>
+    </ParticipantShell>
   );
 }
