@@ -4,7 +4,7 @@ import { useMemo, useState, useTransition } from "react";
 import Link from "next/link";
 import { submitPredictionAction } from "@/app/actions/predictions";
 import { teamGradient, teamInitials } from "@/lib/team-visuals";
-import type { Competition, TeamSide } from "@/lib/types";
+import type { Competition } from "@/lib/types";
 
 export interface OpenMatchData {
   id: string;
@@ -16,11 +16,9 @@ export interface OpenMatchData {
   kickoffAt: string;
   isJokerEligible: boolean;
   jokerAvailableThisWeek: boolean;
-  scorerOptions: Array<{ id: string; playerName: string; teamSide: TeamSide }>;
   existing: {
     predictedHomeScore: number | null;
     predictedAwayScore: number | null;
-    scorerOptionId: string | null;
     jokerUsed: boolean;
   } | null;
 }
@@ -92,7 +90,6 @@ function formatKickoff(iso: string): string {
 interface DraftState {
   home: string;
   away: string;
-  scorerOptionId: string | null;
   joker: boolean;
 }
 
@@ -116,14 +113,13 @@ export default function PredictionWizard({
         initial[m.id] = {
           home: String(m.existing.predictedHomeScore ?? ""),
           away: String(m.existing.predictedAwayScore ?? ""),
-          scorerOptionId: m.existing.scorerOptionId,
           joker: m.existing.jokerUsed,
         };
       }
     }
     return initial;
   });
-  const [draft, setDraft] = useState<DraftState>({ home: "", away: "", scorerOptionId: null, joker: false });
+  const [draft, setDraft] = useState<DraftState>({ home: "", away: "", joker: false });
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
 
@@ -142,7 +138,6 @@ export default function PredictionWizard({
       fd.set("predictedHomeScore", draft.home);
       fd.set("predictedAwayScore", draft.away);
     }
-    if (draft.scorerOptionId) fd.set("scorerOptionId", draft.scorerOptionId);
     if (draft.joker) fd.set("jokerUsed", "on");
 
     startTransition(async () => {
@@ -153,7 +148,7 @@ export default function PredictionWizard({
       }
       setSavedDrafts((prev) => ({ ...prev, [match.id]: draft }));
       setDoneIds((prev) => new Set(prev).add(match.id));
-      setDraft({ home: "", away: "", scorerOptionId: null, joker: false });
+      setDraft({ home: "", away: "", joker: false });
     });
   }
 
@@ -199,9 +194,6 @@ export default function PredictionWizard({
 
               if (isDone) {
                 const saved = savedDrafts[m.id];
-                const scorerLabel = saved?.scorerOptionId
-                  ? m.scorerOptions.find((o) => o.id === saved.scorerOptionId)?.playerName
-                  : null;
                 return (
                   <div key={m.id} className="p-card done">
                     <div className="p-done-row">
@@ -212,7 +204,6 @@ export default function PredictionWizard({
                           <span>{m.awayTeam}</span>
                           {saved?.joker && <span title="Joker kullanıldı">🃏</span>}
                         </div>
-                        {scorerLabel && <div className="p-done-scorer">İlk gol: {scorerLabel}</div>}
                       </div>
                       <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
                         {saved && (saved.home !== "" || saved.away !== "") && (
@@ -228,9 +219,6 @@ export default function PredictionWizard({
               }
 
               if (isActive) {
-                const homePlayers = m.scorerOptions.filter((o) => o.teamSide === "home");
-                const awayPlayers = m.scorerOptions.filter((o) => o.teamSide === "away");
-                const neutral = m.scorerOptions.filter((o) => o.teamSide === "none");
                 return (
                   <div key={m.id} className="p-card active">
                     <div className="p-match-meta">
@@ -268,34 +256,6 @@ export default function PredictionWizard({
                         <div className="p-team-name">{m.awayTeam}</div>
                       </div>
                     </div>
-
-                    {m.scorerOptions.length > 0 && (
-                      <div className="p-scorer-section">
-                        <div className="p-scorer-label">İlk golü kim atar?</div>
-                        <div className="p-chips">
-                          {[...homePlayers, ...awayPlayers].map((p) => (
-                            <button
-                              key={p.id}
-                              type="button"
-                              className={`p-chip${draft.scorerOptionId === p.id ? " selected" : ""}`}
-                              onClick={() => setDraft((d) => ({ ...d, scorerOptionId: p.id }))}
-                            >
-                              {p.playerName}
-                            </button>
-                          ))}
-                          {neutral.map((p) => (
-                            <button
-                              key={p.id}
-                              type="button"
-                              className={`p-chip neutral${draft.scorerOptionId === p.id ? " selected" : ""}`}
-                              onClick={() => setDraft((d) => ({ ...d, scorerOptionId: p.id }))}
-                            >
-                              {p.playerName}
-                            </button>
-                          ))}
-                        </div>
-                      </div>
-                    )}
 
                     {m.isJokerEligible && (
                       <label

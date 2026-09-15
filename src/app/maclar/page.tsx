@@ -1,7 +1,6 @@
 import { redirect } from "next/navigation";
 import {
   getMatchPhaseSync,
-  getMatchWithOptions,
   hasUsedJokerThisWeek,
   listMatches,
   listPredictionsForParticipant,
@@ -38,7 +37,6 @@ export default async function MaclarPage() {
 
   const openMatches: OpenMatchData[] = await Promise.all(
     openMatchesRaw.map(async (m) => {
-      const full = await getMatchWithOptions(m.id);
       const existing = predictionByMatch.get(m.id) ?? null;
       let jokerAvailableThisWeek = false;
       if (m.isJokerEligible) {
@@ -59,16 +57,10 @@ export default async function MaclarPage() {
         kickoffAt: m.kickoffAt,
         isJokerEligible: m.isJokerEligible,
         jokerAvailableThisWeek,
-        scorerOptions: (full?.scorerOptions ?? []).map((o) => ({
-          id: o.id,
-          playerName: o.playerName,
-          teamSide: o.teamSide,
-        })),
         existing: existing
           ? {
               predictedHomeScore: existing.predictedHomeScore ?? null,
               predictedAwayScore: existing.predictedAwayScore ?? null,
-              scorerOptionId: existing.scorerOptionId ?? null,
               jokerUsed: existing.jokerUsed,
             }
           : null,

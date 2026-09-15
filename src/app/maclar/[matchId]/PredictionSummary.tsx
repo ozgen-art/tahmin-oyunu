@@ -43,11 +43,11 @@ export default function PredictionSummary({
         : "—",
       points: existing.scorePointsEarned,
     },
-    {
-      label: "İlk Golü Atan",
-      value: scorerOpt?.playerName ?? "—",
-      points: existing.scorerPointsEarned,
-    },
+    // "İlk Golü Atan" kategorisi kaldırıldı — sadece bu tahmin eski bir
+    // seçime sahipse (kaldırmadan önce yapılmışsa) gösteriliyor.
+    ...(scorerOpt
+      ? [{ label: "İlk Golü Atan", value: scorerOpt.playerName, points: existing.scorerPointsEarned }]
+      : []),
   ];
 
   const total =

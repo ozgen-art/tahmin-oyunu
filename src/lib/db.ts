@@ -528,7 +528,6 @@ export async function submitPrediction(input: {
   matchId: string;
   predictedHomeScore?: number;
   predictedAwayScore?: number;
-  scorerOptionId?: string;
   jokerUsed?: boolean;
 }): Promise<void> {
   const db = getSupabaseAdmin();
@@ -573,7 +572,6 @@ export async function submitPrediction(input: {
     );
     patch.result_option_id = matchingOpt?.id ?? null;
   }
-  if (input.scorerOptionId !== undefined) patch.scorer_option_id = input.scorerOptionId || null;
   if (input.jokerUsed !== undefined) patch.joker_used = input.jokerUsed;
 
   const { data: existing, error: existingErr } = await db

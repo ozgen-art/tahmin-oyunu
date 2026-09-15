@@ -33,7 +33,6 @@ export async function submitPredictionAction(
   const matchId = String(formData.get("matchId") ?? "");
   if (!matchId) return { error: "Geçersiz maç." };
 
-  const scorerOptionId = String(formData.get("scorerOptionId") ?? "") || undefined;
   const jokerUsed = formData.get("jokerUsed") === "on";
 
   const homeRaw = String(formData.get("predictedHomeScore") ?? "");
@@ -47,9 +46,8 @@ export async function submitPredictionAction(
   if ((predictedHomeScore === undefined) !== (predictedAwayScore === undefined)) {
     return { error: "Skor için hem ev sahibi hem deplasman skorunu girin." };
   }
-
-  if (predictedHomeScore === undefined && !scorerOptionId) {
-    return { error: "En az skoru veya ilk golü atan oyuncuyu tahmin etmelisin." };
+  if (predictedHomeScore === undefined) {
+    return { error: "Bir skor tahmini girmelisin." };
   }
 
   try {
@@ -58,7 +56,6 @@ export async function submitPredictionAction(
       matchId,
       predictedHomeScore,
       predictedAwayScore,
-      scorerOptionId,
       jokerUsed,
     });
   } catch (err) {

@@ -6,11 +6,15 @@ yarışması. "Premium Tahmin" temalı (koyu/altın renkli, Sora+Inter fontlu) k
 `src/app/maclar/PredictionWizard.tsx`) şeklinde çalışır — admin paneli ise kasıtlı olarak sade/nötr
 bırakıldı (`src/app/admin/layout.tsx`).
 
-Katılımcılar her maç için iki kategoride tahmin yapar:
+Katılımcılar her maç için tek bir şey tahmin eder:
 
-1. **Kesin Skor** — elle girilir (ör. "3-2"); **Maç Sonucu (1/Berabere/2) girilen skordan otomatik
-   türetilir**, ayrıca sorulmaz.
-2. **İlk Golü Atan Oyuncu** — listeden (çip olarak) seçilir.
+- **Kesin Skor** — elle girilir (ör. "3-2"); **Maç Sonucu (1/Berabere/2) girilen skordan otomatik
+  türetilir**, ayrıca sorulmaz.
+
+> **Not:** "İlk Golü Atan Oyuncu" kategorisi **şimdilik kaldırıldı** (UEFA'nın kadro sayfası
+> güvenilir isim vermediği için) — DB şeması (`scorer_options`, `predictions.scorer_option_id`,
+> `matches.final_scorer_option_id`) duruyor, sadece UI'dan (`PredictionWizard.tsx`, admin
+> `FinalizeForm`/`ScorerOddsForm`) çıkarıldı. Geri getirmek istenirse bu dosyalara bakın.
 
 **Oranlar ve puanlar katılımcıya hiç gösterilmez.** Tahminler kör olarak girilir; puan
 hesaplaması tamamen arka planda yapılır (bkz. [Puanlama mantığı özeti](#puanlama-mantığı-özeti)).
@@ -112,16 +116,22 @@ maçların oranlarını günceller (`external_ref` ile dedupe edilir).
 hata döner. Bu yüzden bir maçı yakalamak için butona **her gün** basmak gerekiyor; ileri tarihli
 bir maç takvimi/fikstür listesi gösteremiyoruz. Üst plana (Pro/Ultra/Mega, $19/ay+) geçilirse bu
 kısıt kalkar ve daha geniş bir tarih aralığı sorgulanabilir — `odds-source.ts`'te değişiklik
-gerekmez. Ayrıca "İlk Golü Atan" piyasası sadece bazı bookmaker'larda/büyük maçlarda mevcut; boş
-gelirse admin panelinden elle tamamlanmalı.
+gerekmez.
+
+**Bilinen sorun (Eylül 2026):** API-Football hesabı, Vercel'in paylaşımlı/dinamik outbound
+IP'si API-Football'un kötüye kullanım (anti-abuse) sistemini tetiklediği için **askıya
+alındı**. Düzelene kadar maçlar/oranlar UEFA.com'un resmi fikstür + kadro sayfalarından elle
+(admin panelinden manuel giriş ile) ekleniyor, oranlar da tahmini olarak belirleniyor. Kalıcı
+çözüm için sabit/dedicated bir outbound IP gerekiyor (proxy servisi ya da ayrı bir VPS'ten
+çalıştırma) — bkz. proje geçmişi/konuşma notları.
 
 ## Puanlama mantığı özeti
 
 - Bir maça **başlama saatinden sonra** tahmin girilemez/değiştirilemez (kilitlenir).
 - **Oranlar/puanlar katılımcıya hiç gösterilmez** — tahminler kör girilir, puan sadece maç
   bittikten sonra (`/tahminlerim`, maç sayfası, liderlik tablosu) görünür.
-- **Maç Sonucu** ve **İlk Golü Atan**: doğru tahmin, seçilen seçeneğin (tüm bahisçilerin
-  ortalaması alınmış — bkz. `odds-source.ts`) puanını kazandırır.
+- **Maç Sonucu**: doğru tahmin, seçilen seçeneğin (tüm bahisçilerin ortalaması alınmış — bkz.
+  `odds-source.ts`) puanını kazandırır.
 - **Kesin Skor** (`src/lib/scoring.ts` → `computeScorePoints`), dört kademeli:
   - **Tam tuttu**: bilinen skorsa gerçek oranın puanı; bilinmiyorsa (ör. 5-0 gibi ekstrem bir
     skor) bilinen skorlardan kalibre edilmiş bir Poisson modeliyle **"optimum" bir oran**

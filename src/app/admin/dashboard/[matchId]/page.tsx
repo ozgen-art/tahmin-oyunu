@@ -7,7 +7,6 @@ import {
   FinalizeForm,
   ResultOddsForm,
   ScoreOddsForm,
-  ScorerOddsForm,
 } from "./AdminMatchForms";
 
 export default async function AdminMatchPage({
@@ -56,12 +55,8 @@ export default async function AdminMatchPage({
         <ScoreOddsForm matchId={match.id} options={match.scoreOptions} />
       </Section>
 
-      <Section title="İlk Golü Atan Oranları">
-        <ScorerOddsForm matchId={match.id} options={match.scorerOptions} />
-      </Section>
-
       <Section title="Maçı Sonuçlandır">
-        <FinalizeForm matchId={match.id} scorerOptions={match.scorerOptions} match={match} />
+        <FinalizeForm matchId={match.id} match={match} />
       </Section>
     </div>
   );
