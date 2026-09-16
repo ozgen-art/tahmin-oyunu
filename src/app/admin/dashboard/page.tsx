@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { assertAdmin } from "@/lib/require-admin";
-import { getLeaderboard, listMatches } from "@/lib/db";
+import { getLeaderboard, getPendingPredictions, listMatches } from "@/lib/db";
 import { adminLogoutAction } from "@/app/actions/admin";
 import NewMatchForm from "./NewMatchForm";
 import ImportMatchesButton from "./ImportMatchesButton";
@@ -13,10 +13,17 @@ const COMPETITION_LABEL: Record<string, string> = {
 
 export default async function AdminDashboardPage() {
   await assertAdmin();
-  const [matches, leaderboard] = await Promise.all([listMatches(), getLeaderboard()]);
+  const [matches, leaderboard, pending] = await Promise.all([
+    listMatches(),
+    getLeaderboard(),
+    getPendingPredictions(),
+  ]);
   const participants = [...leaderboard].sort(
     (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
   );
+  const openMatchCount = pending[0]?.openMatchCount ?? 0;
+  const pendingWithMissing = pending.filter((p) => p.missingMatches.length > 0);
+  const pendingComplete = pending.filter((p) => p.missingMatches.length === 0);
 
   return (
     <div className="flex flex-col gap-8">
@@ -51,6 +58,69 @@ export default async function AdminDashboardPage() {
       <section className="flex flex-col gap-3">
         <h2 className="font-semibold">Yeni Maç Ekle (Manuel)</h2>
         <NewMatchForm />
+      </section>
+
+      <section className="flex flex-col gap-3">
+        <h2 className="font-semibold">Tahmin Hatırlatma</h2>
+        {openMatchCount === 0 ? (
+          <p className="text-sm text-black/50 dark:text-white/50">
+            Şu an tahmine açık bir maç yok.
+          </p>
+        ) : pendingWithMissing.length === 0 ? (
+          <p className="text-sm text-emerald-600 dark:text-emerald-400">
+            Herkes şu anki {openMatchCount} açık maçın tamamına tahmin girmiş. 🎉
+          </p>
+        ) : (
+          <>
+            <p className="text-sm text-black/60 dark:text-white/60">
+              Şu an tahmine açık {openMatchCount} maç var. Aşağıdakilerin en az bir eksik
+              tahmini var — en eksik olan en üstte.
+            </p>
+            <div className="overflow-x-auto">
+              <table className="w-full min-w-[560px] border-collapse overflow-hidden rounded-lg border border-black/10 text-sm dark:border-white/15">
+                <thead>
+                  <tr className="bg-black/5 dark:bg-white/5">
+                    <th className="px-3 py-2 text-left">İsim</th>
+                    <th className="px-3 py-2 text-left">Girdi / Toplam</th>
+                    <th className="px-3 py-2 text-left">Eksik Maçlar</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {pendingWithMissing.map((p) => (
+                    <tr key={p.participantId} className="border-t border-black/10 dark:border-white/10">
+                      <td className="px-3 py-2 font-medium">{p.displayName}</td>
+                      <td className="px-3 py-2 whitespace-nowrap text-black/60 dark:text-white/60">
+                        {p.predictedCount} / {p.openMatchCount}
+                      </td>
+                      <td className="px-3 py-2">
+                        <div className="flex flex-wrap gap-1.5">
+                          {p.missingMatches.map((m) => (
+                            <span
+                              key={m.id}
+                              className="rounded bg-amber-600/10 px-2 py-0.5 text-xs text-amber-700 dark:text-amber-400"
+                              title={new Date(m.kickoffAt).toLocaleString("tr-TR", {
+                                dateStyle: "medium",
+                                timeStyle: "short",
+                              })}
+                            >
+                              {m.homeTeam} - {m.awayTeam}
+                            </span>
+                          ))}
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            {pendingComplete.length > 0 && (
+              <p className="text-xs text-black/40 dark:text-white/40">
+                Tamamı girilmiş ({pendingComplete.length} kişi):{" "}
+                {pendingComplete.map((p) => p.displayName).join(", ")}
+              </p>
+            )}
+          </>
+        )}
       </section>
 
       <section className="flex flex-col gap-3">

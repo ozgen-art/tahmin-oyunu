@@ -78,7 +78,10 @@ npm run dev
   üzerinden tahmin yapılır, `/tahminlerim` kişisel geçmişi, `/liderlik-tablosu` genel sıralamayı
   gösterir.
 - **Admin**: `/admin` üzerinden `.env.local`'daki `ADMIN_PASSWORD` ile giriş yapılır. Maç ekleme,
-  oran girişi (puanlar DB'de otomatik hesaplanır) ve maç sonuçlandırma buradan yapılır.
+  oran girişi (puanlar DB'de otomatik hesaplanır) ve maç sonuçlandırma buradan yapılır. "Tahmin
+  Hatırlatma" bölümü, hâlâ tahmine açık maçlardan hangi katılımcının hangilerine tahmin girmediğini
+  (en eksik olan en üstte) listeler — kime hatırlatma yapılacağını bulmak için (bkz.
+  `getPendingPredictions` in `src/lib/db.ts`).
 
 ## Vercel'e deploy
 

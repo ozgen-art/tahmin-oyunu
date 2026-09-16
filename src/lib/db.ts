@@ -652,3 +652,78 @@ export async function getLeaderboard(): Promise<LeaderboardRow[]> {
 
   return [...rows.values()].sort((a, b) => b.totalPoints - a.totalPoints);
 }
+
+export interface PendingPredictionMatch {
+  id: string;
+  competition: Match["competition"];
+  homeTeam: string;
+  awayTeam: string;
+  kickoffAt: string;
+}
+
+export interface PendingPredictionRow {
+  participantId: string;
+  displayName: string;
+  openMatchCount: number;
+  predictedCount: number;
+  missingMatches: PendingPredictionMatch[];
+}
+
+/**
+ * Her katılımcı için, hâlâ tahmine açık (kilitlenmemiş) maçlardan hangilerine
+ * henüz tahmin girmediğini döner — admin panelinde hatırlatma yapılacak
+ * kişileri bulmak için. En çok eksiği olan en üstte.
+ */
+export async function getPendingPredictions(): Promise<PendingPredictionRow[]> {
+  const db = getSupabaseAdmin();
+  const [participantsRes, predictionsRes, matchesRes] = await Promise.all([
+    db.from("participants").select("id, display_name, created_at"),
+    db.from("predictions").select("participant_id, match_id"),
+    db.from("matches").select("*"),
+  ]);
+  if (participantsRes.error) throw new Error(participantsRes.error.message);
+  if (predictionsRes.error) throw new Error(predictionsRes.error.message);
+  if (matchesRes.error) throw new Error(matchesRes.error.message);
+
+  const openMatches = (matchesRes.data as MatchRow[])
+    .map(mapMatch)
+    .filter((m) => getMatchPhaseSync(m) === "open")
+    .sort((a, b) => new Date(a.kickoffAt).getTime() - new Date(b.kickoffAt).getTime());
+
+  const predictedSet = new Set(
+    (predictionsRes.data as Array<{ participant_id: string; match_id: string }>).map(
+      (p) => `${p.participant_id}:${p.match_id}`
+    )
+  );
+
+  const participants = participantsRes.data as Array<{
+    id: string;
+    display_name: string;
+    created_at: string;
+  }>;
+
+  const rows: PendingPredictionRow[] = participants.map((p) => {
+    const missingMatches = openMatches
+      .filter((m) => !predictedSet.has(`${p.id}:${m.id}`))
+      .map((m) => ({
+        id: m.id,
+        competition: m.competition,
+        homeTeam: m.homeTeam,
+        awayTeam: m.awayTeam,
+        kickoffAt: m.kickoffAt,
+      }));
+    return {
+      participantId: p.id,
+      displayName: p.display_name,
+      openMatchCount: openMatches.length,
+      predictedCount: openMatches.length - missingMatches.length,
+      missingMatches,
+    };
+  });
+
+  return rows.sort(
+    (a, b) =>
+      b.missingMatches.length - a.missingMatches.length ||
+      a.displayName.localeCompare(b.displayName, "tr")
+  );
+}
