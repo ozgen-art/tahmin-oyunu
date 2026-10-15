@@ -3,13 +3,17 @@ import webpush from "web-push";
 import { getSupabaseAdmin } from "./supabase-admin";
 
 // ---------------------------------------------------------------------------
-// Web push: abonelik kaydı + maçtan ~1 saat ve ~10 dakika önce otomatik hatırlatma
+// Web push: abonelik kaydı + maçtan ~1 saat ve ~20 dakika önce otomatik hatırlatma
 // ---------------------------------------------------------------------------
 
 /** Maça bu kadar süre kala (veya daha az) hatırlatma gönderilir. */
 const REMINDER_LEAD_MS = 65 * 60 * 1000;
-/** İkinci hatırlatma: maça bu kadar süre kala (zamanlayıcı gecikmesine pay bırakıldı). */
-const REMINDER_10MIN_LEAD_MS = 12 * 60 * 1000;
+/**
+ * İkinci (son) hatırlatma: maça ~20 dakika kala. Zamanlayıcı (GitHub Actions)
+ * gecikebildiği için pencere 22 dakika tutuldu. (DB sütununun adı tarihsel
+ * olarak reminder10_sent_at; anlamı "ikinci hatırlatma gönderildi".)
+ */
+const REMINDER_FINAL_LEAD_MS = 22 * 60 * 1000;
 
 export interface PushSubscriptionInput {
   endpoint: string;
@@ -118,7 +122,7 @@ interface DueMatch {
   kickoff_at: string;
 }
 
-type ReminderKind = "hour" | "tenMin";
+type ReminderKind = "hour" | "final";
 
 const REMINDER_KINDS: Record<
   ReminderKind,
@@ -130,11 +134,11 @@ const REMINDER_KINDS: Record<
     title: "⏰ Maçlara 1 saat kaldı!",
     tag: "reminder-hour",
   },
-  tenMin: {
+  final: {
     column: "reminder10_sent_at",
-    leadMs: REMINDER_10MIN_LEAD_MS,
-    title: "⚡ Maça 10 dakika kaldı!",
-    tag: "reminder-10min",
+    leadMs: REMINDER_FINAL_LEAD_MS,
+    title: "⚡ Maça 20 dakika kaldı!",
+    tag: "reminder-final",
   },
 };
 
@@ -163,9 +167,9 @@ async function sendReminderRound(kind: ReminderKind): Promise<ReminderResult> {
   const due = (claimed ?? []) as DueMatch[];
   if (due.length === 0) return { dueMatches: 0, notifiedParticipants: 0, sentNotifications: 0 };
 
-  // 10 dakika turunda yakalanan maç için ayrıca "1 saat kaldı" bildirimi
+  // Son tur (20 dk) turunda yakalanan maç için ayrıca "1 saat kaldı" bildirimi
   // göndermeyi anlamsız olur (maç zaten çok yakın) — onu da gönderilmiş say.
-  if (kind === "tenMin") {
+  if (kind === "final") {
     const { error } = await db
       .from("matches")
       .update({ reminder_sent_at: nowIso })
@@ -224,19 +228,19 @@ async function sendReminderRound(kind: ReminderKind): Promise<ReminderResult> {
 }
 
 export interface RemindersSummary {
-  tenMin: ReminderResult;
+  final: ReminderResult;
   hour: ReminderResult;
 }
 
 /**
- * Zamanlayıcı birkaç dakikada bir çağırır. Önce 10 dakika turu (yakın maçlar
- * 1 saatlik bildirim almadan doğrudan 10 dakikalığı alsın), sonra 1 saat turu.
+ * Zamanlayıcı birkaç dakikada bir çağırır. Önce son tur (yakın maçlar
+ * 1 saatlik bildirim almadan doğrudan son hatırlatmayı alsın), sonra 1 saat turu.
  */
 export async function sendDueReminders(): Promise<RemindersSummary> {
   configureWebPush();
-  const tenMin = await sendReminderRound("tenMin");
+  const final = await sendReminderRound("final");
   const hour = await sendReminderRound("hour");
-  return { tenMin, hour };
+  return { final, hour };
 }
 
 /** Admin panelinden "test bildirimi": tüm kayıtlı cihazlara gönderir. */

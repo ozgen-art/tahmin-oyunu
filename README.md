@@ -133,7 +133,7 @@ alındı**. Düzelene kadar maçlar/oranlar UEFA.com'un resmi fikstür + kadro s
 Katılımcılar siteyi telefonlarının ana ekranına ekleyip `/maclar`'daki **"Bildirimleri aç"**
 butonuna basınca (iPhone'da iOS 16.4+ ve ana ekrandaki simgeden açılmış olmak şart) cihazları
 `push_subscriptions` tablosuna kaydolur (`src/components/PushToggle.tsx`, `public/sw.js`).
-Maçlara **~1 saat** ve **~10 dakika kala** (`src/lib/push.ts` → `sendDueReminders`), o maçlara
+Maçlara **~1 saat** ve **~20 dakika kala** (`src/lib/push.ts` → `sendDueReminders`), o maçlara
 tahmin girmemiş ve bildirimi açmış herkese tek bir bildirim gider; her maç için iki hatırlatma da
 `matches.reminder_sent_at` / `reminder10_sent_at` ile bir kez işaretlenir (migration 0006 + 0007).
 
