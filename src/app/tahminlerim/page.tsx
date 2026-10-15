@@ -18,6 +18,10 @@ export default async function TahminlerimPage() {
     listPredictionsForParticipant(participant.id),
   ]);
   const predictionByMatch = new Map(predictions.map((p) => [p.matchId, p]));
+  // En yeni (en son oynanacak/oynanan) maç en üstte.
+  const sortedMatches = [...matches].sort(
+    (a, b) => new Date(b.kickoffAt).getTime() - new Date(a.kickoffAt).getTime()
+  );
 
   const totalPoints = predictions.reduce(
     (sum, p) => sum + (p.resultPointsEarned ?? 0) + (p.scorePointsEarned ?? 0) + (p.scorerPointsEarned ?? 0),
@@ -32,7 +36,7 @@ export default async function TahminlerimPage() {
       </p>
 
       <div className="p-match-list">
-        {matches.map((match) => {
+        {sortedMatches.map((match) => {
           const pred = predictionByMatch.get(match.id);
           const phase = getMatchPhaseSync(match);
           const points = pred
