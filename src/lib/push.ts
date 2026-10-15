@@ -3,11 +3,13 @@ import webpush from "web-push";
 import { getSupabaseAdmin } from "./supabase-admin";
 
 // ---------------------------------------------------------------------------
-// Web push: abonelik kaydı + maçtan ~1 saat önce otomatik hatırlatma
+// Web push: abonelik kaydı + maçtan ~1 saat ve ~10 dakika önce otomatik hatırlatma
 // ---------------------------------------------------------------------------
 
 /** Maça bu kadar süre kala (veya daha az) hatırlatma gönderilir. */
 const REMINDER_LEAD_MS = 65 * 60 * 1000;
+/** İkinci hatırlatma: maça bu kadar süre kala (zamanlayıcı gecikmesine pay bırakıldı). */
+const REMINDER_10MIN_LEAD_MS = 12 * 60 * 1000;
 
 export interface PushSubscriptionInput {
   endpoint: string;
@@ -109,36 +111,68 @@ export interface ReminderResult {
   sentNotifications: number;
 }
 
+interface DueMatch {
+  id: string;
+  home_team: string;
+  away_team: string;
+  kickoff_at: string;
+}
+
+type ReminderKind = "hour" | "tenMin";
+
+const REMINDER_KINDS: Record<
+  ReminderKind,
+  { column: "reminder_sent_at" | "reminder10_sent_at"; leadMs: number; title: string; tag: string }
+> = {
+  hour: {
+    column: "reminder_sent_at",
+    leadMs: REMINDER_LEAD_MS,
+    title: "⏰ Maçlara 1 saat kaldı!",
+    tag: "reminder-hour",
+  },
+  tenMin: {
+    column: "reminder10_sent_at",
+    leadMs: REMINDER_10MIN_LEAD_MS,
+    title: "⚡ Maça 10 dakika kaldı!",
+    tag: "reminder-10min",
+  },
+};
+
 /**
- * Başlamasına ~1 saat (REMINDER_LEAD_MS) kalan ve henüz hatırlatılmamış
- * maçları bulur; bu maçların en az birine tahmin girmemiş her katılımcının
- * kayıtlı cihazlarına TEK bir bildirim gönderir. Zamanlayıcı birkaç dakikada
- * bir çağırdığı için aynı maçlar bir kez işaretlenir (reminder_sent_at).
+ * Bir hatırlatma turu: başlamasına `leadMs` veya daha az kalan ve bu tür için
+ * henüz hatırlatılmamış maçları atomik olarak "sahiplenir" (iki eşzamanlı
+ * çalışma aynı maçı iki kez bildirmesin), sonra bu maçların en az birine tahmin
+ * girmemiş her katılımcının kayıtlı cihazlarına TEK bir bildirim gönderir.
  */
-export async function sendDueReminders(): Promise<ReminderResult> {
-  configureWebPush();
+async function sendReminderRound(kind: ReminderKind): Promise<ReminderResult> {
+  const cfg = REMINDER_KINDS[kind];
   const db = getSupabaseAdmin();
   const nowIso = new Date().toISOString();
-  const horizonIso = new Date(Date.now() + REMINDER_LEAD_MS).toISOString();
+  const horizonIso = new Date(Date.now() + cfg.leadMs).toISOString();
 
-  // Atomik "sahiplenme": iki eşzamanlı çalışma aynı maçı iki kez bildirmesin.
   const { data: claimed, error: claimErr } = await db
     .from("matches")
-    .update({ reminder_sent_at: nowIso })
+    .update({ [cfg.column]: nowIso })
     .eq("status", "scheduled")
-    .is("reminder_sent_at", null)
+    .is(cfg.column, null)
     .gt("kickoff_at", nowIso)
     .lte("kickoff_at", horizonIso)
     .select("id, home_team, away_team, kickoff_at");
   if (claimErr) throw new Error(claimErr.message);
 
-  const due = (claimed ?? []) as Array<{
-    id: string;
-    home_team: string;
-    away_team: string;
-    kickoff_at: string;
-  }>;
+  const due = (claimed ?? []) as DueMatch[];
   if (due.length === 0) return { dueMatches: 0, notifiedParticipants: 0, sentNotifications: 0 };
+
+  // 10 dakika turunda yakalanan maç için ayrıca "1 saat kaldı" bildirimi
+  // göndermeyi anlamsız olur (maç zaten çok yakın) — onu da gönderilmiş say.
+  if (kind === "tenMin") {
+    const { error } = await db
+      .from("matches")
+      .update({ reminder_sent_at: nowIso })
+      .in("id", due.map((m) => m.id))
+      .is("reminder_sent_at", null);
+    if (error) throw new Error(error.message);
+  }
 
   const dueIds = due.map((m) => m.id);
   const [subsRes, predsRes] = await Promise.all([
@@ -170,10 +204,10 @@ export async function sendDueReminders(): Promise<ReminderResult> {
     const shown = names.slice(0, 3).join(", ");
     const extra = names.length > 3 ? ` ve ${names.length - 3} maç daha` : "";
     const payload: PushPayload = {
-      title: "⏰ Maçlara 1 saat kaldı!",
+      title: cfg.title,
       body: `Tahmin girmediğin maçlar: ${shown}${extra}`,
       url: "/maclar",
-      tag: "reminder",
+      tag: cfg.tag,
     };
 
     let anySent = false;
@@ -187,6 +221,22 @@ export async function sendDueReminders(): Promise<ReminderResult> {
   }
 
   return { dueMatches: due.length, notifiedParticipants, sentNotifications };
+}
+
+export interface RemindersSummary {
+  tenMin: ReminderResult;
+  hour: ReminderResult;
+}
+
+/**
+ * Zamanlayıcı birkaç dakikada bir çağırır. Önce 10 dakika turu (yakın maçlar
+ * 1 saatlik bildirim almadan doğrudan 10 dakikalığı alsın), sonra 1 saat turu.
+ */
+export async function sendDueReminders(): Promise<RemindersSummary> {
+  configureWebPush();
+  const tenMin = await sendReminderRound("tenMin");
+  const hour = await sendReminderRound("hour");
+  return { tenMin, hour };
 }
 
 /** Admin panelinden "test bildirimi": tüm kayıtlı cihazlara gönderir. */

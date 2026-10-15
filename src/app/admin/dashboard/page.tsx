@@ -67,8 +67,8 @@ export default async function AdminDashboardPage() {
       <section className="flex flex-col gap-3">
         <h2 className="font-semibold">Tahmin Hatırlatma</h2>
         <p className="text-sm text-black/60 dark:text-white/60">
-          Maçlara 1 saat kala, tahmin girmemiş ve bildirimleri açmış herkese telefonlarına otomatik
-          bildirim gider. Bildirim açan: <b>{pushEnabledCount} / {participants.length}</b> kişi.
+          Maçlara 1 saat ve 10 dakika kala, tahmin girmemiş ve bildirimleri açmış herkese telefonlarına
+          otomatik bildirim gider. Bildirim açan: <b>{pushEnabledCount} / {participants.length}</b> kişi.
         </p>
         <TestPushButton />
         {openMatchCount === 0 ? (
