@@ -1,10 +1,12 @@
 import Link from "next/link";
 import { assertAdmin } from "@/lib/require-admin";
 import { getLeaderboard, getPendingPredictions, listMatches } from "@/lib/db";
+import { countSubscriptionsByParticipant } from "@/lib/push";
 import { adminLogoutAction } from "@/app/actions/admin";
 import NewMatchForm from "./NewMatchForm";
 import ImportMatchesButton from "./ImportMatchesButton";
 import SyncResultsButton from "./SyncResultsButton";
+import TestPushButton from "./TestPushButton";
 
 const COMPETITION_LABEL: Record<string, string> = {
   UCL: "Şampiyonlar Ligi",
@@ -13,10 +15,11 @@ const COMPETITION_LABEL: Record<string, string> = {
 
 export default async function AdminDashboardPage() {
   await assertAdmin();
-  const [matches, leaderboard, pending] = await Promise.all([
+  const [matches, leaderboard, pending, pushCounts] = await Promise.all([
     listMatches(),
     getLeaderboard(),
     getPendingPredictions(),
+    countSubscriptionsByParticipant(),
   ]);
   const participants = [...leaderboard].sort(
     (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
@@ -24,6 +27,7 @@ export default async function AdminDashboardPage() {
   const openMatchCount = pending[0]?.openMatchCount ?? 0;
   const pendingWithMissing = pending.filter((p) => p.missingMatches.length > 0);
   const pendingComplete = pending.filter((p) => p.missingMatches.length === 0);
+  const pushEnabledCount = participants.filter((p) => (pushCounts.get(p.participantId) ?? 0) > 0).length;
 
   return (
     <div className="flex flex-col gap-8">
@@ -62,6 +66,11 @@ export default async function AdminDashboardPage() {
 
       <section className="flex flex-col gap-3">
         <h2 className="font-semibold">Tahmin Hatırlatma</h2>
+        <p className="text-sm text-black/60 dark:text-white/60">
+          Maçlara 1 saat kala, tahmin girmemiş ve bildirimleri açmış herkese telefonlarına otomatik
+          bildirim gider. Bildirim açan: <b>{pushEnabledCount} / {participants.length}</b> kişi.
+        </p>
+        <TestPushButton />
         {openMatchCount === 0 ? (
           <p className="text-sm text-black/50 dark:text-white/50">
             Şu an tahmine açık bir maç yok.
@@ -129,11 +138,12 @@ export default async function AdminDashboardPage() {
           <p className="text-sm text-black/50 dark:text-white/50">Henüz kimse kayıt olmadı.</p>
         ) : (
           <div className="overflow-x-auto">
-            <table className="w-full min-w-[420px] border-collapse overflow-hidden rounded-lg border border-black/10 text-sm dark:border-white/15">
+            <table className="w-full min-w-[480px] border-collapse overflow-hidden rounded-lg border border-black/10 text-sm dark:border-white/15">
               <thead>
                 <tr className="bg-black/5 dark:bg-white/5">
                   <th className="px-3 py-2 text-left">İsim</th>
                   <th className="px-3 py-2 text-left">Kayıt Tarihi</th>
+                  <th className="px-3 py-2 text-center">Bildirim</th>
                   <th className="px-3 py-2 text-right">Tahmin</th>
                   <th className="px-3 py-2 text-right">Puan</th>
                 </tr>
@@ -147,6 +157,9 @@ export default async function AdminDashboardPage() {
                         dateStyle: "medium",
                         timeStyle: "short",
                       })}
+                    </td>
+                    <td className="px-3 py-2 text-center">
+                      {(pushCounts.get(p.participantId) ?? 0) > 0 ? "🔔" : "—"}
                     </td>
                     <td className="px-3 py-2 text-right">{p.matchesPredicted}</td>
                     <td className="px-3 py-2 text-right font-semibold">{p.totalPoints}</td>

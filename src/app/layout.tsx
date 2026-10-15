@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Sora, Inter } from "next/font/google";
 import "./globals.css";
 
@@ -18,6 +18,12 @@ export const metadata: Metadata = {
   title: "UCL · UEL Tahmin Yarışması",
   description:
     "Şampiyonlar Ligi ve UEFA Avrupa Ligi maçları için skor, ilk gol ve kazanan tahmini yapıp puan topla.",
+  appleWebApp: { capable: true, title: "Tahmin", statusBarStyle: "black-translucent" },
+  icons: { icon: "/pwa-icon/192", apple: "/pwa-icon/180" },
+};
+
+export const viewport: Viewport = {
+  themeColor: "#0c0a1a",
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {

@@ -8,6 +8,7 @@ import {
 import { getIsoWeekKey } from "@/lib/joker";
 import { getCurrentParticipant } from "@/lib/participant-session";
 import ParticipantShell from "@/components/ParticipantShell";
+import PushToggle from "@/components/PushToggle";
 import PredictionWizard, {
   type FinishedMatchData,
   type LockedMatchData,
@@ -111,6 +112,7 @@ export default async function MaclarPage({
         Hoş geldin, <span>{participant.displayName}</span>
       </h1>
       <p className="p-subtitle">Bu haftanın maçlarını sırayla tahmin et</p>
+      <PushToggle />
       <PredictionWizard
         openMatches={openMatches}
         lockedMatches={lockedMatches}

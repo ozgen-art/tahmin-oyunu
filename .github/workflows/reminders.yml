@@ -1,0 +1,20 @@
+name: Maç hatırlatma bildirimleri
+
+# Vercel Hobby planında cron günde bir kez çalışabildiği için, "maçtan 1 saat
+# önce" bildirimi için siteyi her 5 dakikada bir buradan tetikliyoruz.
+# Gerekli repo secret'ları: SITE_URL (ör. https://tahmin-oyunu-three.vercel.app)
+# ve CRON_SECRET (Vercel'deki CRON_SECRET ile aynı değer).
+on:
+  schedule:
+    - cron: "*/5 * * * *"
+  workflow_dispatch:
+
+jobs:
+  remind:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Hatırlatma endpoint'ini çağır
+        run: |
+          curl --fail --silent --show-error --max-time 60 \
+            -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}" \
+            "${{ secrets.SITE_URL }}/api/cron/reminders"
