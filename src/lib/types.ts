@@ -13,8 +13,7 @@ export interface Match {
   awayTeam: string;
   kickoffAt: string; // ISO datetime
   status: MatchStatus;
-  /** Galatasaray / Fenerbahçe / Beşiktaş / Trabzonspor'un oynadığı maç mı —
-   * joker (3 kat puan) sadece bu maçlarda kullanılabilir. */
+  /** Eski kural kalıntısı: artık joker her maçta kullanılabilir, bu alan hep true. */
   isJokerEligible: boolean;
   /** API-Football'dan gelen forma/logo görseli — yoksa arayüz baş harf rozetine düşer. */
   homeLogoUrl?: string;
@@ -72,7 +71,7 @@ export interface Prediction {
   predictedHomeScore?: number;
   predictedAwayScore?: number;
   scorerOptionId?: string;
-  /** Bu tahmin için haftalık jokerin kullanılıp kullanılmadığı (puan x3). */
+  /** Bu tahmin için günlük jokerin kullanılıp kullanılmadığı (puan x3). */
   jokerUsed: boolean;
   resultPointsEarned?: number;
   scorePointsEarned?: number;

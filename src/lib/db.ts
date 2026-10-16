@@ -1,7 +1,7 @@
 import "server-only";
 import { getSupabaseAdmin } from "./supabase-admin";
 import { computeScorePoints, deriveWinner } from "./scoring";
-import { getIsoWeekKey, isJokerEligibleMatch, JOKER_MULTIPLIER } from "./joker";
+import { getJokerDayKey, JOKER_MULTIPLIER } from "./joker";
 import { sha256Hex, randomToken } from "./hash";
 import type {
   Match,
@@ -216,7 +216,7 @@ export async function createMatch(input: {
       external_ref: input.externalRef ?? null,
       home_logo_url: input.homeLogoUrl ?? null,
       away_logo_url: input.awayLogoUrl ?? null,
-      is_joker_eligible: isJokerEligibleMatch(input.homeTeam, input.awayTeam),
+      is_joker_eligible: true,
     })
     .select("*")
     .single();
@@ -247,7 +247,7 @@ export async function updateMatchInfo(
       home_team: input.homeTeam.trim(),
       away_team: input.awayTeam.trim(),
       kickoff_at: new Date(input.kickoffAt).toISOString(),
-      is_joker_eligible: isJokerEligibleMatch(input.homeTeam, input.awayTeam),
+      is_joker_eligible: true,
     })
     .eq("id", matchId);
   if (error) throw new Error(error.message);
@@ -380,8 +380,8 @@ export async function finalizeMatch(
           ? scorerOpt.points
           : 0;
 
-      // Joker: bu maça (sadece GS/FB/BJK/TS maçlarında, haftada bir kez)
-      // jokerini kullandıysa toplam kazandığı puan 3 katına çıkar.
+      // Joker: bu maça (günde bir kez, istediği maçta) jokerini kullandıysa
+      // toplam kazandığı puan 3 katına çıkar.
       if (pred.jokerUsed) {
         resultPointsEarned *= JOKER_MULTIPLIER;
         scorePointsEarned *= JOKER_MULTIPLIER;
@@ -498,12 +498,12 @@ export async function listPredictionsForParticipant(participantId: string): Prom
   return (data as PredictionRow[]).map(mapPrediction);
 }
 
-/** Katılımcının bu hafta (verilen maçın haftasında) başka bir maçta joker
+/** Katılımcının o gün (verilen maçın TSİ gününde) başka bir maçta joker
  * kullanıp kullanmadığını döner. `excludeMatchId` verilirse o maç hariç
  * tutulur (aynı maçtaki joker kutusunu açıp kapatabilsin diye). */
-export async function hasUsedJokerThisWeek(
+export async function hasUsedJokerOnDay(
   participantId: string,
-  weekKey: string,
+  dayKey: string,
   excludeMatchId?: string
 ): Promise<boolean> {
   const db = getSupabaseAdmin();
@@ -519,7 +519,7 @@ export async function hasUsedJokerThisWeek(
     (row) =>
       row.match_id !== excludeMatchId &&
       row.matches &&
-      getIsoWeekKey(row.matches.kickoff_at) === weekKey
+      getJokerDayKey(row.matches.kickoff_at) === dayKey
   );
 }
 
@@ -547,12 +547,9 @@ export async function submitPrediction(input: {
   }
 
   if (input.jokerUsed) {
-    if (!match.is_joker_eligible) {
-      throw new Error("Joker sadece Galatasaray, Fenerbahçe, Beşiktaş veya Trabzonspor maçlarında kullanılabilir.");
-    }
-    const weekKey = getIsoWeekKey(match.kickoff_at);
-    if (await hasUsedJokerThisWeek(input.participantId, weekKey, input.matchId)) {
-      throw new Error("Bu haftaki jokerini zaten başka bir maçta kullandın.");
+    const dayKey = getJokerDayKey(match.kickoff_at);
+    if (await hasUsedJokerOnDay(input.participantId, dayKey, input.matchId)) {
+      throw new Error("Bugünkü jokerini zaten başka bir maçta kullandın.");
     }
   }
 

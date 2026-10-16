@@ -12,8 +12,8 @@ export default async function HomePage() {
       </h1>
       <p className="p-subtitle">
         UEFA Şampiyonlar Ligi &amp; UEFA Avrupa Ligi maçları için skor ve ilk gol tahmini yap —
-        oranları görmeden, kör tahmin. Her hafta bir maçta jokerini kullanıp puanını 3&apos;e
-        katlayabilirsin.
+        oranları görmeden, kör tahmin. Her gün istediğin bir maçta jokerini kullanıp puanını
+        3&apos;e katlayabilirsin.
       </p>
 
       <div className="flex flex-wrap gap-3" style={{ marginBottom: 28 }}>
@@ -48,11 +48,11 @@ export default async function HomePage() {
         </div>
         <div className="p-card">
           <p className="p-scorer-label" style={{ marginBottom: 4 }}>
-            🃏 Haftalık joker
+            🃏 Günlük joker
           </p>
           <p style={{ fontSize: 14, lineHeight: 1.5 }}>
-            Galatasaray, Fenerbahçe, Beşiktaş veya Trabzonspor&apos;un oynadığı bir maçta haftada
-            bir kez joker kullanabilirsin — o maçtan kazandığın puan 3 katına çıkar.
+            Her gün, istediğin bir maçta bir kez joker kullanabilirsin — o maçtan kazandığın puan
+            3 katına çıkar.
           </p>
         </div>
         <div className="p-card">

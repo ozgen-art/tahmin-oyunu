@@ -1,11 +1,10 @@
 import { redirect } from "next/navigation";
 import {
   getMatchPhaseSync,
-  hasUsedJokerThisWeek,
   listMatches,
   listPredictionsForParticipant,
 } from "@/lib/db";
-import { getIsoWeekKey } from "@/lib/joker";
+import { getJokerDayKey } from "@/lib/joker";
 import { getCurrentParticipant } from "@/lib/participant-session";
 import ParticipantShell from "@/components/ParticipantShell";
 import PushToggle from "@/components/PushToggle";
@@ -41,18 +40,20 @@ export default async function MaclarPage({
     .filter((m) => m.phase === "finished")
     .sort((a, b) => new Date(b.kickoffAt).getTime() - new Date(a.kickoffAt).getTime());
 
+  // Günlük joker: hangi gün (TSİ) hangi maçta joker kullanılmış.
+  const kickoffByMatch = new Map(matches.map((m) => [m.id, m.kickoffAt]));
+  const jokerMatchByDay = new Map<string, string>();
+  for (const p of predictions) {
+    const kickoff = kickoffByMatch.get(p.matchId);
+    if (p.jokerUsed && kickoff) jokerMatchByDay.set(getJokerDayKey(kickoff), p.matchId);
+  }
+
   const openMatches: OpenMatchData[] = await Promise.all(
     openMatchesRaw.map(async (m) => {
       const existing = predictionByMatch.get(m.id) ?? null;
-      let jokerAvailableThisWeek = false;
-      if (m.isJokerEligible) {
-        const usedElsewhere = await hasUsedJokerThisWeek(
-          participant.id,
-          getIsoWeekKey(m.kickoffAt),
-          m.id
-        );
-        jokerAvailableThisWeek = !usedElsewhere;
-      }
+      const jokerMatchId = jokerMatchByDay.get(getJokerDayKey(m.kickoffAt));
+      // O gün jokerini başka bir maçta kullandıysa bu maçta kapalı.
+      const jokerAvailableToday = !jokerMatchId || jokerMatchId === m.id;
       return {
         id: m.id,
         competition: m.competition,
@@ -61,8 +62,7 @@ export default async function MaclarPage({
         homeLogoUrl: m.homeLogoUrl,
         awayLogoUrl: m.awayLogoUrl,
         kickoffAt: m.kickoffAt,
-        isJokerEligible: m.isJokerEligible,
-        jokerAvailableThisWeek,
+        jokerAvailableToday,
         existing: existing
           ? {
               predictedHomeScore: existing.predictedHomeScore ?? null,

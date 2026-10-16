@@ -166,10 +166,10 @@ gönder" butonu bulunur.
   - **Kısmi** (ne skor ne fark ama ev veya deplasman skorundan biri birebir doğru — ör. 3-1
     dedin, 5-1 bitti): tam puanın **1/10**'u.
   - Hiçbiri tutmadıysa 0.
-- **Joker** (`src/lib/joker.ts`): sadece **Galatasaray / Fenerbahçe / Beşiktaş / Trabzonspor**
-  maçlarında (`matches.is_joker_eligible`, takım isminden otomatik tespit edilir), katılımcı
-  başına **haftada bir maçta** kullanılabilir (ISO hafta, ilgili maçın kickoff'una göre). Joker
-  kullanılan tahminin kazandığı toplam puan **3 katına** çıkar.
+- **Joker** (`src/lib/joker.ts`): katılımcı **her maçta, istediği maçı seçerek, günde bir kez**
+  (gün = maçın Türkiye saatindeki takvim günü) joker kullanabilir. Joker kullanılan tahminin
+  kazandığı toplam puan **3 katına** çıkar. (Eski kural — haftada bir ve sadece GS/FB/BJK/TS
+  maçlarında — kaldırıldı; `matches.is_joker_eligible` artık hep true.)
   Liderlik tablosu, tüm sonuçlanmış maçlardaki kazanılan puanların (joker dahil) toplamıdır.
 
 ## Yapı
@@ -183,7 +183,7 @@ src/
     supabase-admin.ts       service-role Supabase client (sadece sunucu)
     db.ts                    veri erişim katmanı (Supabase sorguları)
     scoring.ts               oran → puan formülü, skor puanlama kademeleri, Poisson tahmini
-    joker.ts                  haftalık joker (GS/FB/BJK/TS tespiti, ISO hafta, x3 çarpan)
+    joker.ts                  günlük joker (TSİ gün anahtarı, x3 çarpan)
     parse.ts                  admin panelindeki toplu oran metinlerini ayrıştırma
     admin-auth.ts / require-admin.ts    admin şifre/oturum
     participant-session.ts                katılımcı oturumu (cookie)

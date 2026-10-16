@@ -24,11 +24,6 @@ export default async function AdminMatchPage({
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-bold">
           {match.homeTeam} vs {match.awayTeam}
-          {match.isJokerEligible && (
-            <span className="ml-2 align-middle text-base" title="Joker uygun maç (GS/FB/BJK/TS)">
-              🃏
-            </span>
-          )}
         </h1>
         <DeleteMatchButton matchId={match.id} />
       </div>

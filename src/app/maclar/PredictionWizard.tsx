@@ -14,8 +14,7 @@ export interface OpenMatchData {
   homeLogoUrl?: string;
   awayLogoUrl?: string;
   kickoffAt: string;
-  isJokerEligible: boolean;
-  jokerAvailableThisWeek: boolean;
+  jokerAvailableToday: boolean;
   existing: {
     predictedHomeScore: number | null;
     predictedAwayScore: number | null;
@@ -282,27 +281,25 @@ export default function PredictionWizard({
                       </div>
                     </div>
 
-                    {m.isJokerEligible && (
-                      <label
-                        className={`p-joker-toggle${!m.jokerAvailableThisWeek ? " disabled" : ""}`}
+                    <label
+                        className={`p-joker-toggle${!m.jokerAvailableToday ? " disabled" : ""}`}
                       >
                         <input
                           type="checkbox"
                           checked={draft.joker}
-                          disabled={!m.jokerAvailableThisWeek}
+                          disabled={!m.jokerAvailableToday}
                           onChange={(e) => setDraft((d) => ({ ...d, joker: e.target.checked }))}
                         />
                         <span>
                           <strong>🃏 Jokerimi bu maçta kullan</strong> — kazandığın puan 3 katına
                           çıkar.
-                          {!m.jokerAvailableThisWeek && (
+                          {!m.jokerAvailableToday && (
                             <span className="p-muted" style={{ display: "block", marginTop: 2 }}>
-                              Bu haftaki jokerini zaten başka bir maçta kullandın.
+                              Bugünkü jokerini zaten başka bir maçta kullandın.
                             </span>
                           )}
                         </span>
-                      </label>
-                    )}
+                    </label>
 
                     {error && <p className="p-error" style={{ marginTop: 10 }}>{error}</p>}
                     {successId === m.id && (
