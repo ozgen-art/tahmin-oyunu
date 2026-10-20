@@ -137,8 +137,11 @@ Maçlara **~1 saat** ve **~20 dakika kala** (`src/lib/push.ts` → `sendDueRemin
 tahmin girmemiş ve bildirimi açmış herkese tek bir bildirim gider; her maç için iki hatırlatma da
 `matches.reminder_sent_at` / `reminder10_sent_at` ile bir kez işaretlenir (migration 0006 + 0007).
 
-Tetikleme: Vercel Hobby cron'u günde bir kez çalışabildiği için `.github/workflows/reminders.yml`
-her 5 dakikada `GET /api/cron/reminders` (başlık: `Authorization: Bearer <CRON_SECRET>`) çağırır.
+Tetikleme: Vercel Hobby cron'u günde bir kez çalışabildiği için asıl tetikleyici **Supabase pg_cron**
+(`supabase/cron/reminders.sql`): her 2 dakikada `GET /api/cron/reminders` (başlık:
+`Authorization: Bearer <CRON_SECRET>`) çağırır. `.github/workflows/reminders.yml` yedek olarak duruyor,
+ama GitHub'ın zamanlanmış işleri saatlerce atlayabildiği için ona güvenilmez (bir maç turu bildirimsiz
+kalmıştı). Aynı maç iki kez bildirilmez (atomik işaretleme).
 
 Gerekli ayarlar:
 - **Vercel env** (Production): `NEXT_PUBLIC_VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`, `VAPID_SUBJECT`,
