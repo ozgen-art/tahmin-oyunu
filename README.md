@@ -67,6 +67,9 @@ kullanıcılar kayıt olduktan sonra bu sahte maçlar kaldırıldı (asla sonuç
 maçlar admin panelinden ekleniyor — bkz. aşağıdaki "Canlı oran/sonuç API'si" bölümü.
 `0003_add_external_ref.sql`, API'den içe aktarılan maçları tekrar eklememek için bir dedupe
 sütunu ekler.
+`0008_explicit_grants.sql`, Supabase'in 30 Ekim 2026 değişikliği (yeni tablolara Data API yetkisinin
+otomatik verilmemesi) için `service_role`'e yetkileri açıkça verir; yeni tablo eklerken aynı
+migration'a `grant ... to service_role` satırı eklemeyi unutma.
 
 ### 3. Çalıştır
 
