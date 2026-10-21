@@ -1,16 +1,17 @@
 import { getJokerDayKey } from "./joker";
 
 /** Liderlik tablosu dönemleri. Gün/hafta Türkiye saatine (TSİ) göre, hafta Pazartesi başlar. */
-export type LeaderboardPeriod = "gunluk" | "haftalik" | "toplam";
+export type LeaderboardPeriod = "gunluk" | "haftalik" | "aralik" | "toplam";
 
 export const PERIOD_LABELS: Record<LeaderboardPeriod, string> = {
   gunluk: "Günlük",
   haftalik: "Haftalık",
+  aralik: "Tarih Aralığı",
   toplam: "Toplam",
 };
 
 export function parsePeriod(value: string | undefined): LeaderboardPeriod {
-  return value === "gunluk" || value === "haftalik" ? value : "toplam";
+  return value === "gunluk" || value === "haftalik" || value === "aralik" ? value : "toplam";
 }
 
 /** Bir anın TSİ gününe ait anahtar (ör. "2026-10-21"). */
@@ -58,4 +59,29 @@ export function pickReferenceKey(currentKey: string, finishedKeys: string[]): st
   if (finishedKeys.length === 0) return null;
   if (finishedKeys.includes(currentKey)) return currentKey;
   return [...finishedKeys].sort().at(-1) ?? null;
+}
+
+const DAY_KEY_RE = /^\d{4}-\d{2}-\d{2}$/;
+
+/** Geçerli bir gün anahtarı (YYYY-MM-DD) ise döner, değilse null. */
+export function parseDayKey(value: string | undefined): string | null {
+  if (!value || !DAY_KEY_RE.test(value)) return null;
+  return Number.isNaN(new Date(`${value}T12:00:00Z`).getTime()) ? null : value;
+}
+
+/** `fromKey`..`toKey` (dahil) arasındaki tüm günlerin anahtarları. */
+export function listDayKeys(fromKey: string, toKey: string): string[] {
+  const keys: string[] = [];
+  const cur = new Date(`${fromKey}T12:00:00Z`);
+  const end = new Date(`${toKey}T12:00:00Z`);
+  while (cur <= end && keys.length < 400) {
+    keys.push(cur.toISOString().slice(0, 10));
+    cur.setUTCDate(cur.getUTCDate() + 1);
+  }
+  return keys;
+}
+
+/** "15 Eylül" */
+export function formatShortDayLabel(dayKey: string): string {
+  return dayFmt(new Date(`${dayKey}T12:00:00Z`), { day: "numeric", month: "long" });
 }
