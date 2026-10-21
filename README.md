@@ -173,7 +173,10 @@ gönder" butonu bulunur.
   (gün = maçın Türkiye saatindeki takvim günü) joker kullanabilir. Joker kullanılan tahminin
   kazandığı toplam puan **3 katına** çıkar. (Eski kural — haftada bir ve sadece GS/FB/BJK/TS
   maçlarında — kaldırıldı; `matches.is_joker_eligible` artık hep true.)
-  Liderlik tablosu, tüm sonuçlanmış maçlardaki kazanılan puanların (joker dahil) toplamıdır.
+  Liderlik tablosu (`/liderlik-tablosu`) üç sekmelidir: **Toplam** (tüm sonuçlanmış maçlar, joker dahil),
+  **Günlük** ve **Haftalık** (`src/lib/periods.ts`; gün/hafta Türkiye saatine göre, hafta Pazartesi
+  başlar, maçın kickoff'una göre sayılır). Günlük/Haftalık, bugün/bu hafta içinde sonuçlanmış maç
+  yoksa en son sonuçlanmış gün/haftayı gösterir (etikette hangisi olduğu yazar).
 
 ## Yapı
 

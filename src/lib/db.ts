@@ -608,19 +608,28 @@ export interface LeaderboardRow {
   matchesFinished: number;
 }
 
-export async function getLeaderboard(): Promise<LeaderboardRow[]> {
+/**
+ * `includeMatch` verilirse sadece kickoff_at'i bu koşulu sağlayan maçlar
+ * sayılır (günlük / haftalık liderlik tablosu için). Verilmezse tüm maçlar.
+ */
+export async function getLeaderboard(options?: {
+  includeMatch?: (kickoffAt: string) => boolean;
+}): Promise<LeaderboardRow[]> {
   const db = getSupabaseAdmin();
   const [participantsRes, predictionsRes, matchesRes] = await Promise.all([
     db.from("participants").select("id, display_name, created_at"),
     db.from("predictions").select("*"),
-    db.from("matches").select("id, status"),
+    db.from("matches").select("id, status, kickoff_at"),
   ]);
   if (participantsRes.error) throw new Error(participantsRes.error.message);
   if (predictionsRes.error) throw new Error(predictionsRes.error.message);
   if (matchesRes.error) throw new Error(matchesRes.error.message);
 
-  const matchStatus = new Map(
-    (matchesRes.data as Array<{ id: string; status: string }>).map((m) => [m.id, m.status])
+  const matchInfo = new Map(
+    (matchesRes.data as Array<{ id: string; status: string; kickoff_at: string }>).map((m) => [
+      m.id,
+      { status: m.status, kickoffAt: m.kickoff_at },
+    ])
   );
 
   const rows = new Map<string, LeaderboardRow>();
@@ -638,9 +647,11 @@ export async function getLeaderboard(): Promise<LeaderboardRow[]> {
   for (const predRow of predictionsRes.data as PredictionRow[]) {
     const pred = mapPrediction(predRow);
     const row = rows.get(pred.participantId);
-    if (!row) continue;
+    const info = matchInfo.get(pred.matchId);
+    if (!row || !info) continue;
+    if (options?.includeMatch && !options.includeMatch(info.kickoffAt)) continue;
     row.matchesPredicted += 1;
-    if (matchStatus.get(pred.matchId) === "finished") {
+    if (info.status === "finished") {
       row.matchesFinished += 1;
       row.totalPoints +=
         (pred.resultPointsEarned ?? 0) + (pred.scorePointsEarned ?? 0) + (pred.scorerPointsEarned ?? 0);
