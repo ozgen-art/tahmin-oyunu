@@ -75,6 +75,36 @@ export default async function TahminlerimPage() {
                     )}
                   </div>
                 </div>
+                {pred && pred.predictedHomeScore !== undefined && pred.predictedAwayScore !== undefined && (
+                  <div
+                    style={{
+                      display: "flex",
+                      flexWrap: "wrap",
+                      alignItems: "center",
+                      gap: "4px 14px",
+                      marginTop: 10,
+                      paddingTop: 8,
+                      borderTop: "1px solid rgba(255,255,255,0.08)",
+                      fontSize: 13,
+                    }}
+                  >
+                    <span>
+                      <span className="p-muted">Tahminin: </span>
+                      <strong style={{ color: "var(--p-gold-soft)" }}>
+                        {pred.predictedHomeScore} - {pred.predictedAwayScore}
+                      </strong>
+                      {pred.jokerUsed && <span title="Joker kullanıldı"> 🃏</span>}
+                    </span>
+                    {phase === "finished" && match.finalHomeScore !== undefined && match.finalAwayScore !== undefined && (
+                      <span>
+                        <span className="p-muted">Sonuç: </span>
+                        <strong>
+                          {match.finalHomeScore} - {match.finalAwayScore}
+                        </strong>
+                      </span>
+                    )}
+                  </div>
+                )}
               </div>
             </Link>
           );
