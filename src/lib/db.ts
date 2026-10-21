@@ -599,6 +599,28 @@ export async function submitPrediction(input: {
 // Liderlik tablosu
 // ---------------------------------------------------------------------------
 
+/**
+ * PostgREST tek istekte en fazla 1000 satır döndürür; daha fazla tahmin varsa
+ * sessizce keser. Bu yardımcı tüm tahminleri sayfalayarak çeker.
+ */
+async function selectAllPredictions<T>(columns: string): Promise<T[]> {
+  const db = getSupabaseAdmin();
+  const PAGE = 1000;
+  const all: T[] = [];
+  for (let from = 0; ; from += PAGE) {
+    const { data, error } = await db
+      .from("predictions")
+      .select(columns)
+      .order("id", { ascending: true })
+      .range(from, from + PAGE - 1);
+    if (error) throw new Error(error.message);
+    const rows = (data ?? []) as unknown as T[];
+    all.push(...rows);
+    if (rows.length < PAGE) break;
+  }
+  return all;
+}
+
 export interface LeaderboardRow {
   participantId: string;
   displayName: string;
@@ -616,13 +638,12 @@ export async function getLeaderboard(options?: {
   includeMatch?: (kickoffAt: string) => boolean;
 }): Promise<LeaderboardRow[]> {
   const db = getSupabaseAdmin();
-  const [participantsRes, predictionsRes, matchesRes] = await Promise.all([
+  const [participantsRes, predictionRows, matchesRes] = await Promise.all([
     db.from("participants").select("id, display_name, created_at"),
-    db.from("predictions").select("*"),
+    selectAllPredictions<PredictionRow>("*"),
     db.from("matches").select("id, status, kickoff_at"),
   ]);
   if (participantsRes.error) throw new Error(participantsRes.error.message);
-  if (predictionsRes.error) throw new Error(predictionsRes.error.message);
   if (matchesRes.error) throw new Error(matchesRes.error.message);
 
   const matchInfo = new Map(
@@ -644,7 +665,7 @@ export async function getLeaderboard(options?: {
     });
   }
 
-  for (const predRow of predictionsRes.data as PredictionRow[]) {
+  for (const predRow of predictionRows) {
     const pred = mapPrediction(predRow);
     const row = rows.get(pred.participantId);
     const info = matchInfo.get(pred.matchId);
@@ -684,13 +705,12 @@ export interface PendingPredictionRow {
  */
 export async function getPendingPredictions(): Promise<PendingPredictionRow[]> {
   const db = getSupabaseAdmin();
-  const [participantsRes, predictionsRes, matchesRes] = await Promise.all([
+  const [participantsRes, predictionRows, matchesRes] = await Promise.all([
     db.from("participants").select("id, display_name, created_at"),
-    db.from("predictions").select("participant_id, match_id"),
+    selectAllPredictions<{ participant_id: string; match_id: string }>("participant_id, match_id"),
     db.from("matches").select("*"),
   ]);
   if (participantsRes.error) throw new Error(participantsRes.error.message);
-  if (predictionsRes.error) throw new Error(predictionsRes.error.message);
   if (matchesRes.error) throw new Error(matchesRes.error.message);
 
   const openMatches = (matchesRes.data as MatchRow[])
@@ -698,11 +718,7 @@ export async function getPendingPredictions(): Promise<PendingPredictionRow[]> {
     .filter((m) => getMatchPhaseSync(m) === "open")
     .sort((a, b) => new Date(a.kickoffAt).getTime() - new Date(b.kickoffAt).getTime());
 
-  const predictedSet = new Set(
-    (predictionsRes.data as Array<{ participant_id: string; match_id: string }>).map(
-      (p) => `${p.participant_id}:${p.match_id}`
-    )
-  );
+  const predictedSet = new Set(predictionRows.map((p) => `${p.participant_id}:${p.match_id}`));
 
   const participants = participantsRes.data as Array<{
     id: string;
@@ -734,4 +750,64 @@ export async function getPendingPredictions(): Promise<PendingPredictionRow[]> {
       b.missingMatches.length - a.missingMatches.length ||
       a.displayName.localeCompare(b.displayName, "tr")
   );
+}
+
+// ---------------------------------------------------------------------------
+// Liderlik tablosu (istemci tarafı sekmeler için ham veri)
+// ---------------------------------------------------------------------------
+
+export interface LeaderboardData {
+  participants: Array<{ id: string; name: string }>;
+  /** Sadece sonuçlanmış maçlardaki tahminler: p=katılımcı, d=maçın TSİ gün anahtarı, pts=kazanılan puan. */
+  entries: Array<{ p: string; d: string; pts: number }>;
+  /** Sonuçlanmış maçı olan günlerin (TSİ) tekil listesi. */
+  finishedDays: string[];
+  /** En erken maçın TSİ günü (tarih listesinin başlangıcı); maç yoksa null. */
+  firstMatchDay: string | null;
+}
+
+export async function getLeaderboardData(): Promise<LeaderboardData> {
+  const db = getSupabaseAdmin();
+  const [participantsRes, predictionRows, matchesRes] = await Promise.all([
+    db.from("participants").select("id, display_name"),
+    selectAllPredictions<PredictionRow>("*"),
+    db.from("matches").select("id, status, kickoff_at"),
+  ]);
+  if (participantsRes.error) throw new Error(participantsRes.error.message);
+  if (matchesRes.error) throw new Error(matchesRes.error.message);
+
+  const matches = matchesRes.data as Array<{ id: string; status: string; kickoff_at: string }>;
+  const dayByFinishedMatch = new Map<string, string>();
+  const finishedDays = new Set<string>();
+  let firstMatchDay: string | null = null;
+  for (const m of matches) {
+    const day = getJokerDayKey(m.kickoff_at);
+    if (firstMatchDay === null || day < firstMatchDay) firstMatchDay = day;
+    if (m.status === "finished") {
+      dayByFinishedMatch.set(m.id, day);
+      finishedDays.add(day);
+    }
+  }
+
+  const entries: LeaderboardData["entries"] = [];
+  for (const row of predictionRows) {
+    const day = dayByFinishedMatch.get(row.match_id);
+    if (!day) continue;
+    const pred = mapPrediction(row);
+    entries.push({
+      p: pred.participantId,
+      d: day,
+      pts: (pred.resultPointsEarned ?? 0) + (pred.scorePointsEarned ?? 0) + (pred.scorerPointsEarned ?? 0),
+    });
+  }
+
+  return {
+    participants: (participantsRes.data as Array<{ id: string; display_name: string }>).map((p) => ({
+      id: p.id,
+      name: p.display_name,
+    })),
+    entries,
+    finishedDays: [...finishedDays].sort(),
+    firstMatchDay,
+  };
 }

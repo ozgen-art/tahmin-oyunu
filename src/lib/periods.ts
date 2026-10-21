@@ -19,13 +19,18 @@ export function getDayKey(dateInput: string | Date): string {
   return getJokerDayKey(dateInput);
 }
 
-/** O günün ait olduğu haftanın Pazartesi'sinin gün anahtarı (ör. "2026-10-19"). */
-export function getWeekStartKey(dateInput: string | Date): string {
-  const [y, m, d] = getDayKey(dateInput).split("-").map(Number);
+/** Bir gün anahtarının (YYYY-MM-DD) ait olduğu haftanın Pazartesi'sinin gün anahtarı. */
+export function weekStartFromDayKey(dayKey: string): string {
+  const [y, m, d] = dayKey.split("-").map(Number);
   const date = new Date(Date.UTC(y, m - 1, d));
   const dow = date.getUTCDay() || 7; // Pazartesi=1 .. Pazar=7
   date.setUTCDate(date.getUTCDate() - (dow - 1));
   return date.toISOString().slice(0, 10);
+}
+
+/** O anın ait olduğu haftanın Pazartesi'sinin gün anahtarı (ör. "2026-10-19"). */
+export function getWeekStartKey(dateInput: string | Date): string {
+  return weekStartFromDayKey(getDayKey(dateInput));
 }
 
 const dayFmt = (date: Date, opts: Intl.DateTimeFormatOptions) =>

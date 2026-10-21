@@ -179,7 +179,9 @@ gönder" butonu bulunur.
   Liderlik tablosu (`/liderlik-tablosu`) dört sekmelidir: **Toplam** (tüm sonuçlanmış maçlar, joker dahil),
   **Günlük** ve **Haftalık** (`src/lib/periods.ts`; gün/hafta Türkiye saatine göre, hafta Pazartesi
   başlar, maçın kickoff'una göre sayılır) ile **Tarih Aralığı** (başlangıç/bitiş için açılır listeler,
-  ör. 15 Eylül - 22 Eylül) sekmelerine sahiptir. Günlük/Haftalık, bugün/bu hafta içinde sonuçlanmış maç
+  ör. 15 Eylül - 22 Eylül) sekmelerine sahiptir. Veri sayfa açılırken bir kez çekilir, sekme/tarih
+  değişimi tarayıcıda anında hesaplanır (`LeaderboardTabs.tsx`). Not: Supabase tek istekte en fazla
+  1000 satır döndürdüğü için tüm tahminler `selectAllPredictions` ile sayfalanarak çekilir. Günlük/Haftalık, bugün/bu hafta içinde sonuçlanmış maç
   yoksa en son sonuçlanmış gün/haftayı gösterir (etikette hangisi olduğu yazar).
 
 ## Yapı
